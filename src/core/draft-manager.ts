@@ -15,8 +15,10 @@ export class DraftManager {
     return { editor, text: this.adapter.readDraft(editor) };
   }
 
-  canReplace(snapshot: DraftSnapshot): boolean {
-    return this.adapter.canReplaceDraft(snapshot.editor);
+  canReplace(snapshot: DraftSnapshot, translatedText?: string): boolean {
+    // Undo re-inserts the original text, so it must be insertable as well.
+    return this.adapter.canReplaceDraft(snapshot.editor, snapshot.text) &&
+      (translatedText === undefined || this.adapter.canReplaceDraft(snapshot.editor, translatedText));
   }
 
   isUnchanged(snapshot: DraftSnapshot): boolean {
@@ -25,7 +27,7 @@ export class DraftManager {
   }
 
   async replace(snapshot: DraftSnapshot, translatedText: string): Promise<boolean> {
-    if (!this.isUnchanged(snapshot) || !this.canReplace(snapshot)) return false;
+    if (!this.isUnchanged(snapshot) || !this.canReplace(snapshot, translatedText)) return false;
     const replaced = await this.adapter.replaceDraft(snapshot.editor, translatedText);
     if (!replaced) return false;
 
@@ -39,7 +41,7 @@ export class DraftManager {
     if (!snapshot || this.replacedText === null ||
       !snapshot.editor.isConnected ||
       this.adapter.readDraft(snapshot.editor) !== this.replacedText ||
-      !this.adapter.canReplaceDraft(snapshot.editor)) {
+      !this.adapter.canReplaceDraft(snapshot.editor, snapshot.text)) {
       return false;
     }
 

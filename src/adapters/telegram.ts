@@ -20,7 +20,15 @@ const COMPOSER_CONTAINER_SELECTOR = [
 
 const SEARCH_TERMS = /\b(search|find|filter)\b/i;
 const MESSAGE_TERMS = /\b(message|reply|broadcast|write a message)\b/i;
-const SAFE_CONTENT_TAGS = new Set(['BR']);
+const PROSEMIRROR_TRAILING_BREAK_CLASS = 'ProseMirror-trailingBreak';
+const PROSEMIRROR_SEPARATOR_CLASS = 'ProseMirror-separator';
+// Telegram Web renders paragraphs as <div data-chat-input-paragraph>. Only the
+// classes and attributes observed on plain paragraphs are accepted, so quote,
+// code or other block types keep Replace disabled.
+const TELEGRAM_PARAGRAPH_ATTRIBUTE = 'data-chat-input-paragraph';
+const TELEGRAM_PARAGRAPH_ATTRIBUTES = new Set(['class', 'dir', 'data-placeholder', TELEGRAM_PARAGRAPH_ATTRIBUTE]);
+const TELEGRAM_PARAGRAPH_CLASS = /^(_(Padding|Paragraph)_[\w-]+|chat-input-[\w-]*placeholder[\w-]*)$/;
+const TELEGRAM_TRAILING_PLACEHOLDER_CLASS = 'chat-input-trailing-placeholder';
 
 function isVisible(element: HTMLElement): boolean {
   const style = getComputedStyle(element);
@@ -56,68 +64,173 @@ function isTextArea(element: HTMLElement): element is HTMLTextAreaElement {
   return element instanceof HTMLTextAreaElement;
 }
 
-function hasOnlyPlainTextNodes(editor: HTMLElement): boolean {
-  const walker = document.createTreeWalker(editor, NodeFilter.SHOW_ELEMENT);
-  let node = walker.nextNode();
-  while (node) {
-    if (!(node instanceof HTMLElement) || !SAFE_CONTENT_TAGS.has(node.tagName)) return false;
-    node = walker.nextNode();
-  }
-  return true;
+function isProseMirror(editor: HTMLElement): boolean {
+  return editor.classList.contains('ProseMirror');
 }
 
 function normalizeText(text: string): string {
   return text.replace(/\r\n?/g, '\n').replace(/\u00a0/g, ' ');
 }
 
-function readDraft(editor: HTMLElement): string {
-  return normalizeText(isTextArea(editor) ? editor.value : editor.innerText);
+function isEmojiImage(node: Node): node is HTMLImageElement {
+  return node instanceof HTMLImageElement &&
+    node.classList.length === 1 && node.classList.contains('emoji') &&
+    node.alt !== '' && !Object.keys(node.dataset).length;
 }
 
-function placeCaretAtEnd(editor: HTMLElement): void {
+// Reads text, line breaks and plain emoji images. Returns null for any other
+// node (links, mentions, formatting, custom emoji, media) so callers can treat
+// the draft as rich text that must not be overwritten.
+function readInlineText(container: HTMLElement, skipPlaceholderBreak: boolean): string | null {
+  const nodes = Array.from(container.childNodes);
+  let text = '';
+  for (const [index, node] of nodes.entries()) {
+    if (node instanceof Text) {
+      text += node.data;
+    } else if (node instanceof HTMLBRElement) {
+      if (node.classList.contains(PROSEMIRROR_TRAILING_BREAK_CLASS)) continue;
+      // A trailing <br> in a plain contenteditable is the caret placeholder.
+      if (skipPlaceholderBreak && index === nodes.length - 1) continue;
+      text += '\n';
+    } else if (node instanceof HTMLImageElement && node.classList.contains(PROSEMIRROR_SEPARATOR_CLASS)) {
+      continue;
+    } else if (isEmojiImage(node)) {
+      text += node.alt;
+    } else {
+      return null;
+    }
+  }
+  return text;
+}
+
+// Returns the draft text when it is plain enough to replace and restore
+// exactly, or null when it contains structure that replacement would lose.
+function isPlainParagraph(node: Node): node is HTMLElement {
+  if (node instanceof HTMLParagraphElement) return true;
+  return node instanceof HTMLDivElement &&
+    node.hasAttribute(TELEGRAM_PARAGRAPH_ATTRIBUTE) &&
+    node.getAttributeNames().every((name) => TELEGRAM_PARAGRAPH_ATTRIBUTES.has(name)) &&
+    Array.from(node.classList).every((name) => TELEGRAM_PARAGRAPH_CLASS.test(name));
+}
+
+// Telegram keeps an empty paragraph after the draft; it is not part of the text.
+function findTrailingPlaceholder(editor: HTMLElement): HTMLElement | null {
+  const last = editor.lastElementChild;
+  return last instanceof HTMLElement && editor.childElementCount > 1 &&
+    last.classList.contains(TELEGRAM_TRAILING_PLACEHOLDER_CLASS) &&
+    isPlainParagraph(last) && readInlineText(last, false) === ''
+    ? last
+    : null;
+}
+
+function readPlainDraft(editor: HTMLElement): string | null {
+  if (isTextArea(editor)) return normalizeText(editor.value);
+
+  if (isProseMirror(editor)) {
+    const trailingPlaceholder = findTrailingPlaceholder(editor);
+    const lines: string[] = [];
+    for (const block of Array.from(editor.childNodes)) {
+      if (block === trailingPlaceholder) continue;
+      if (!isPlainParagraph(block)) return null;
+      const line = readInlineText(block, false);
+      if (line === null) return null;
+      lines.push(line);
+    }
+    return normalizeText(lines.join('\n'));
+  }
+
+  const text = readInlineText(editor, true);
+  return text === null ? null : normalizeText(text);
+}
+
+function readDraft(editor: HTMLElement): string {
+  return readPlainDraft(editor) ?? normalizeText(isTextArea(editor) ? editor.value : editor.innerText);
+}
+
+function canInsertText(editor: HTMLElement, text: string): boolean {
+  // ProseMirror's plain-text paste collapses consecutive newlines, so blank
+  // lines cannot be reproduced exactly (and Undo could not restore them).
+  return !(isProseMirror(editor) && normalizeText(text).includes('\n\n'));
+}
+
+function waitForEditor(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+}
+
+function selectEditorContents(editor: HTMLElement): void {
   const selection = editor.ownerDocument.getSelection();
   if (!selection) return;
 
   const range = editor.ownerDocument.createRange();
   range.selectNodeContents(editor);
-  range.collapse(false);
+  // Leave Telegram's trailing placeholder paragraph out of the replacement.
+  const lastContentBlock = findTrailingPlaceholder(editor)?.previousElementSibling;
+  if (lastContentBlock) range.setEnd(lastContentBlock, lastContentBlock.childNodes.length);
   selection.removeAllRanges();
   selection.addRange(range);
 }
 
-function setPlainContent(editor: HTMLElement, text: string): void {
+// Uses native editing commands so the editor observes the change the same
+// way it observes typing; the caret ends up after the inserted text.
+async function insertReplacement(editor: HTMLElement, text: string): Promise<void> {
+  const doc = editor.ownerDocument;
+  editor.focus();
+
   if (isTextArea(editor)) {
-    editor.value = text;
-    editor.setSelectionRange(text.length, text.length);
+    editor.select();
+    doc.execCommand('insertText', false, text);
     return;
   }
 
-  const fragment = editor.ownerDocument.createDocumentFragment();
+  selectEditorContents(editor);
   const lines = text.split('\n');
-  lines.forEach((line, index) => {
-    if (index > 0) fragment.append(editor.ownerDocument.createElement('br'));
-    if (line) fragment.append(editor.ownerDocument.createTextNode(line));
-  });
+  if (lines.length === 1) {
+    doc.execCommand('insertText', false, text);
+    return;
+  }
 
-  editor.replaceChildren(fragment);
-  placeCaretAtEnd(editor);
+  if (isProseMirror(editor)) {
+    // Multi-line native input can look like an Enter press to ProseMirror's
+    // DOM-change detection, and Telegram binds Enter to Send. A plain-text
+    // paste goes through ProseMirror's transaction path instead. Wait first so
+    // ProseMirror picks up the new selection from selectionchange.
+    await waitForEditor();
+    const clipboardData = new DataTransfer();
+    clipboardData.setData('text/plain', text);
+    editor.dispatchEvent(new ClipboardEvent('paste', {
+      clipboardData,
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+    }));
+    return;
+  }
+
+  lines.forEach((line, index) => {
+    if (index > 0) doc.execCommand('insertLineBreak');
+    if (line) doc.execCommand('insertText', false, line);
+  });
 }
 
 async function replaceAndVerify(editor: HTMLElement, text: string): Promise<boolean> {
-  if (!editor.isConnected || !hasOnlyPlainTextNodes(editor)) return false;
+  const original = readPlainDraft(editor);
+  const expected = normalizeText(text);
+  if (!editor.isConnected || original === null ||
+    !canInsertText(editor, expected) || !canInsertText(editor, original)) {
+    return false;
+  }
 
-  editor.focus();
-  setPlainContent(editor, text);
-  editor.dispatchEvent(new InputEvent('input', {
-    bubbles: true,
-    composed: true,
-    inputType: 'insertReplacementText',
-    data: text,
-  }));
+  await insertReplacement(editor, expected);
+  // Telegram may reconcile editor content after the input.
+  await waitForEditor();
+  if (editor.isConnected && readPlainDraft(editor) === expected) return true;
 
-  // Telegram may reconcile controlled editor content after the input event.
-  await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-  return editor.isConnected && readDraft(editor) === normalizeText(text);
+  // The editor rejected or reshaped the text: put the original draft back.
+  if (editor.isConnected && readPlainDraft(editor) !== original) {
+    await insertReplacement(editor, original);
+    await waitForEditor();
+  }
+  return false;
 }
 
 export const telegramEditorAdapter: MessageEditorAdapter = {
@@ -137,8 +250,9 @@ export const telegramEditorAdapter: MessageEditorAdapter = {
 
   readDraft,
 
-  canReplaceDraft(editor): boolean {
-    return editor.isConnected && (isTextArea(editor) || hasOnlyPlainTextNodes(editor));
+  canReplaceDraft(editor, text): boolean {
+    return editor.isConnected && readPlainDraft(editor) !== null &&
+      (text === undefined || canInsertText(editor, text));
   },
 
   replaceDraft: replaceAndVerify,

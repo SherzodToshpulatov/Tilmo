@@ -143,12 +143,16 @@ export default defineContentScript({
 
       if (import.meta.env.DEV) {
         const diagnostics = {
+          mode: import.meta.env.MODE,
+          // More than one host means another copy of the extension is injecting.
+          floatingHostCount: document.querySelectorAll('#browser-translator-floating-host').length,
           composer: getLayerGeometry(activeEditor),
           positioningAnchor: getLayerGeometry(activePositioningAnchor),
           documentRoot: getLayerGeometry(document.documentElement),
           shadowHost: getLayerGeometry(shadowHost),
           uiContainer: getLayerGeometry(uiContainer),
           reactPanel: getLayerGeometry(panelElement),
+          translateButton: getLayerGeometry(panelElement?.querySelector<HTMLElement>('.translate') ?? null),
         };
         const diagnosticKey = JSON.stringify(diagnostics);
         if (diagnosticKey !== lastPositionDiagnostic) {
@@ -217,7 +221,7 @@ export default defineContentScript({
         panelState = {
           status: 'preview',
           translation,
-          canReplace: draftManager.canReplace(snapshot),
+          canReplace: draftManager.canReplace(snapshot, translation),
           error: '',
         };
         render();
@@ -256,7 +260,7 @@ export default defineContentScript({
         panelState = {
           ...panelState,
           status: 'preview',
-          error: 'Telegram did not accept the replacement. Your preview is still available.',
+          error: 'Telegram did not accept the replacement. Check your draft; the preview is still available to copy.',
         };
       } else {
         pendingSnapshot = null;
