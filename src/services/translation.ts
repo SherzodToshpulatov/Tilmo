@@ -29,7 +29,6 @@ export type TranslationErrorCode =
   | 'invalid_response'
   | 'source_language_required'
   | 'language_pair_unavailable'
-  | 'no_translation'
   | 'empty_translation'
   | 'extension_unavailable';
 
@@ -47,7 +46,6 @@ export const TRANSLATION_ERROR_MESSAGES: Record<TranslationErrorCode, string> = 
   invalid_response: 'The translation server returned an unexpected response.',
   source_language_required: 'This translator cannot detect languages. Choose the language your draft is written in.',
   language_pair_unavailable: 'This translator does not support this language pair.',
-  no_translation: 'No translation was found for this language pair. Check the source language or try another translator.',
   empty_translation: 'The translator returned an empty translation.',
   extension_unavailable: 'The extension was updated. Reload this tab to keep translating.',
 };

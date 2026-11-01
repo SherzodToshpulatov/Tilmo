@@ -10,9 +10,12 @@ import {
   type LanguageCode,
   type SourceLanguage,
 } from '../core/languages';
+import { isSameText } from '../core/text';
 import { TRANSLATION_PROVIDERS, isTranslationProviderId } from '../services/providers';
 import { TranslationError, TRANSLATION_ERROR_MESSAGES, type TranslationResult } from '../services/translation';
 import { TranslatePanel, type PanelState } from '../components/TranslatePanel';
+import { EDGE_GAP, computeFloatingLayout } from './layout';
+import { detectColorScheme, type ColorScheme } from './theme';
 import { requestTranslation } from '../utils/messaging';
 import {
   sourceLanguageSetting,
@@ -39,6 +42,8 @@ export interface FloatingTranslatorSite {
   findFocusedComposer(): HTMLElement | null;
   /** Element the floating controls are aligned to (the composer's container). */
   findPositioningAnchor(editor: HTMLElement): HTMLElement;
+  /** The site's own accent colour, used for the primary controls. */
+  accentColor: string;
 }
 
 /**
@@ -66,6 +71,9 @@ export function startFloatingTranslator(ctx: ContentScriptContext, site: Floatin
   let lastTranslation: { key: string; result: TranslationResult } | null = null;
   const sourceLanguage = () =>
     resolveSourceLanguage(storedSourceLanguage, targetLanguage, TRANSLATION_PROVIDERS[provider].supportsAutoDetect);
+  let panelOpen = false;
+  let colorScheme: ColorScheme = 'light';
+  let syncScheduled = false;
   let lastPositionDiagnostic = '';
   const resizeObserver = new ResizeObserver(() => positionUi());
 
@@ -95,17 +103,24 @@ export function startFloatingTranslator(ctx: ContentScriptContext, site: Floatin
     root?.render(
       <TranslatePanel
         visible={activeEditor !== null}
+        open={panelOpen}
         state={panelState}
+        colorScheme={colorScheme}
+        accentColor={site.accentColor}
+        providerLabel={TRANSLATION_PROVIDERS[provider].shortLabel}
         sourceLanguage={sourceLanguage()}
         supportsAutoDetect={TRANSLATION_PROVIDERS[provider].supportsAutoDetect}
         targetLanguage={targetLanguage}
+        canSwapLanguages={swapSource() !== null}
+        onOpen={openPanel}
+        onClose={closePanel}
         onSourceLanguageChange={changeSourceLanguage}
         onTargetLanguageChange={changeTargetLanguage}
+        onSwapLanguages={swapLanguages}
         onTranslate={() => void translateDraft()}
         onReplace={() => void replaceDraft()}
         onUndo={() => void undoReplacement()}
         onCopy={copyTranslation}
-        onCancel={cancelPreview}
       />,
     );
   };
@@ -144,21 +159,14 @@ export function startFloatingTranslator(ctx: ContentScriptContext, site: Floatin
       if (panelElement) resizeObserver.observe(panelElement);
     }
 
-    const anchorRect = activePositioningAnchor.getBoundingClientRect();
     const panelRect = panelElement?.getBoundingClientRect();
-    const width = panelRect?.width || 120;
-    const height = panelRect?.height || 40;
-    const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
-    const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
-    const edgeGap = 8;
-    const boundedWidth = Math.min(width, Math.max(0, viewportWidth - edgeGap * 2));
-    const boundedHeight = Math.min(height, Math.max(0, viewportHeight - edgeGap * 2));
-    const left = Math.max(edgeGap, Math.min(viewportWidth - boundedWidth - edgeGap, anchorRect.right - boundedWidth));
-    const preferredTop = anchorRect.top - height - edgeGap;
-    const top = preferredTop >= edgeGap
-      ? preferredTop
-      : anchorRect.bottom + edgeGap;
-    const boundedTop = Math.max(edgeGap, Math.min(viewportHeight - boundedHeight - edgeGap, top));
+    const { left, top: boundedTop, maxHeight } = computeFloatingLayout({
+      anchor: activePositioningAnchor.getBoundingClientRect(),
+      contentWidth: panelRect?.width || 36,
+      contentHeight: panelRect?.height || 36,
+      viewportWidth: document.documentElement.clientWidth || window.innerWidth,
+      viewportHeight: document.documentElement.clientHeight || window.innerHeight,
+    });
 
     // Inline WXT positioning leaves the host/container alone; the host is the
     // only positioned layer, so these viewport coordinates map directly to it.
@@ -175,9 +183,9 @@ export function startFloatingTranslator(ctx: ContentScriptContext, site: Floatin
     uiContainer.style.position = 'static';
     uiContainer.style.inset = 'auto';
     uiContainer.style.width = 'max-content';
-    uiContainer.style.maxWidth = `calc(100vw - ${edgeGap * 2}px)`;
+    uiContainer.style.maxWidth = `calc(100vw - ${EDGE_GAP * 2}px)`;
     uiContainer.style.height = 'auto';
-    uiContainer.style.maxHeight = `calc(100vh - ${edgeGap * 2}px)`;
+    uiContainer.style.maxHeight = `${maxHeight}px`;
     uiContainer.style.overflowY = 'auto';
     uiContainer.style.margin = '0';
     uiContainer.style.padding = '0';
@@ -194,7 +202,7 @@ export function startFloatingTranslator(ctx: ContentScriptContext, site: Floatin
         shadowHost: getLayerGeometry(shadowHost),
         uiContainer: getLayerGeometry(uiContainer),
         reactPanel: getLayerGeometry(panelElement),
-        translateButton: getLayerGeometry(panelElement?.querySelector<HTMLElement>('.translate') ?? null),
+        translateButton: getLayerGeometry(panelElement?.querySelector<HTMLElement>('.launcher') ?? null),
       };
       const diagnosticKey = JSON.stringify(diagnostics);
       if (diagnosticKey !== lastPositionDiagnostic) {
@@ -202,6 +210,26 @@ export function startFloatingTranslator(ctx: ContentScriptContext, site: Floatin
         lastPositionDiagnostic = diagnosticKey;
       }
     }
+  };
+
+  /**
+   * Re-checks the active composer and position at most once per frame. DOM
+   * mutations and scroll events can fire hundreds of times per frame on busy
+   * pages (feeds, Reels); each check measures layout, so they are coalesced.
+   */
+  const scheduleSync = () => {
+    if (syncScheduled) return;
+    syncScheduled = true;
+    ctx.requestAnimationFrame(() => {
+      syncScheduled = false;
+      if (activeEditor && !activeEditor.isConnected) setActiveEditor(null);
+      if (activeEditor) {
+        setActiveEditor(activeEditor);
+      } else {
+        const focusedEditor = site.findFocusedComposer();
+        if (focusedEditor) setActiveEditor(focusedEditor);
+      }
+    });
   };
 
   const setActiveEditor = (editor: HTMLElement | null) => {
@@ -220,6 +248,9 @@ export function startFloatingTranslator(ctx: ContentScriptContext, site: Floatin
     pendingSnapshot = null;
     pendingLocation = null;
     panelState = INITIAL_PANEL_STATE;
+    panelOpen = false;
+    // Measured once per composer, not per frame: themes rarely change mid-chat.
+    if (activePositioningAnchor) colorScheme = detectColorScheme(activePositioningAnchor);
     observePositionTargets();
     render();
     positionUi();
@@ -269,12 +300,17 @@ export function startFloatingTranslator(ctx: ContentScriptContext, site: Floatin
         return;
       }
 
+      // Unchanged text is shown with a notice, not as an error: names, links
+      // and short words legitimately stay the same.
+      const unchanged = isSameText(translation, snapshot.text);
       panelState = {
         status: 'preview',
         translation,
-        canReplace: draftManager.canReplace(snapshot, translation),
+        canReplace: !unchanged && draftManager.canReplace(snapshot, translation),
         error: '',
+        unchanged,
         detectedSourceLanguage: result.detectedSourceLanguage,
+        translationSource: source,
         translationTarget: target,
         provider: result.provider,
       };
@@ -295,9 +331,42 @@ export function startFloatingTranslator(ctx: ContentScriptContext, site: Floatin
     // Keep a completed replacement so Undo stays available.
     if (panelState.status === 'loading' || panelState.status === 'preview' || panelState.status === 'error') {
       cancelPreview();
+      // The user changed languages in the open panel: translate again with them.
+      if (panelOpen) void translateDraft();
     } else {
       render();
     }
+  }
+
+  /** The language swapping would make the new target, or null if it cannot swap. */
+  function swapSource(): LanguageCode | null {
+    const source = sourceLanguage();
+    if (source !== 'auto') return source;
+    const detected = panelState.detectedSourceLanguage;
+    return isSupportedLanguage(detected) && detected !== targetLanguage ? detected : null;
+  }
+
+  function swapLanguages() {
+    const newTarget = swapSource();
+    if (!newTarget) return;
+    storedSourceLanguage = targetLanguage;
+    targetLanguage = newTarget;
+    void sourceLanguageSetting.setValue(storedSourceLanguage);
+    void targetLanguageSetting.setValue(targetLanguage);
+    onLanguagesChanged();
+  }
+
+  function openPanel() {
+    if (!activeEditor) return;
+    panelOpen = true;
+    if (activePositioningAnchor) colorScheme = detectColorScheme(activePositioningAnchor);
+    render();
+    void translateDraft();
+  }
+
+  function closePanel() {
+    panelOpen = false;
+    cancelPreview();
   }
 
   function changeTargetLanguage(language: LanguageCode) {
@@ -398,22 +467,26 @@ export function startFloatingTranslator(ctx: ContentScriptContext, site: Floatin
     render();
   }
 
+  // composedPath crosses the shadow boundary, so focus and clicks inside the
+  // panel count as ours even where the event target is not retargeted.
+  const isInsideControls = (event: Event) => shadowHost !== null && event.composedPath().includes(shadowHost);
+
   const onFocusIn = (event: FocusEvent) => {
     const editor = site.findComposer(event.target);
     if (editor) {
       setActiveEditor(editor);
-    } else if (!(event.target instanceof Node && shadowHost?.contains(event.target))) {
+    } else if (!isInsideControls(event)) {
       setActiveEditor(null);
     }
   };
 
   const onPointerDown = (event: PointerEvent) => {
     if (site.findComposer(event.target)) return;
-    if (event.target instanceof Node && shadowHost?.contains(event.target)) return;
+    if (isInsideControls(event)) return;
     setActiveEditor(null);
   };
 
-  const onScrollOrResize = () => positionUi();
+  const onScrollOrResize = () => scheduleSync();
   const onLocationChange = () => {
     pendingLocation = null;
     undoLocation = null;
@@ -425,15 +498,7 @@ export function startFloatingTranslator(ctx: ContentScriptContext, site: Floatin
     });
   };
 
-  const observer = new MutationObserver(() => {
-    if (activeEditor && !activeEditor.isConnected) setActiveEditor(null);
-    if (activeEditor) {
-      setActiveEditor(activeEditor);
-    } else {
-      const focusedEditor = site.findFocusedComposer();
-      if (focusedEditor) setActiveEditor(focusedEditor);
-    }
-  });
+  const observer = new MutationObserver(scheduleSync);
 
   document.addEventListener('focusin', onFocusIn, true);
   document.addEventListener('pointerdown', onPointerDown, true);

@@ -24,7 +24,7 @@ describe('mockTranslationService', () => {
 
 describe('providers', () => {
   it('offers MyMemory without auto-detection next to Google Cloud and the demo', () => {
-    expect(TRANSLATION_PROVIDERS.mymemory).toEqual({ label: 'MyMemory (Free)', supportsAutoDetect: false });
+    expect(TRANSLATION_PROVIDERS.mymemory).toMatchObject({ label: 'MyMemory (Free)', shortLabel: 'MyMemory', supportsAutoDetect: false });
     expect(TRANSLATION_PROVIDERS.remote.supportsAutoDetect).toBe(true);
     expect(isTranslationProviderId('mymemory')).toBe(true);
     expect(isTranslationProviderId('toString')).toBe(false);

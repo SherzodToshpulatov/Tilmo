@@ -135,9 +135,10 @@ describe('MyMemoryTranslationService', () => {
     expect(await codeOf(service(ok(translatedText)).translator.translate(UZ_EN))).toBe('empty_translation');
   });
 
-  it('reports an unchanged echo as no translation instead of showing it', async () => {
-    const { translator } = service(ok(' salom, YAXSHIMISAN? '));
-    expect(await codeOf(translator.translate(UZ_EN))).toBe('no_translation');
+  it('returns unchanged text as a result (names and links legitimately stay the same)', async () => {
+    const { translator } = service(ok('Telegram'));
+    expect(await translator.translate({ text: 'Telegram', source: 'uz', target: 'en' }))
+      .toEqual({ translatedText: 'Telegram', detectedSourceLanguage: 'uz', provider: 'mymemory' });
   });
 
   it.each([

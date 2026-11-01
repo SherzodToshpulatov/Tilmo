@@ -11,6 +11,7 @@ import {
 import type { TranslationRequest } from '../services/translation';
 import { isTranslateTextMessage, type TranslateTextResponse } from '../utils/messaging';
 import { FLOATING_HOST_ID, startFloatingTranslator } from './floating-translator';
+import { translationProviderSetting } from '../utils/settings';
 
 const instagram = {
   name: 'Instagram',
@@ -18,6 +19,7 @@ const instagram = {
   findComposer: findInstagramComposer,
   findFocusedComposer: findFocusedInstagramComposer,
   findPositioningAnchor: findInstagramComposerPositioningAnchor,
+  accentColor: '#0095f6',
 };
 
 let contexts: ContentScriptContext[] = [];
@@ -73,6 +75,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   contexts.forEach((ctx) => ctx.abort());
   contexts = [];
   document.body.innerHTML = '';
@@ -130,7 +133,7 @@ describe('floating translator lifecycle', () => {
 
     button('.translate')!.click();
     await vi.waitFor(() => expect(shadow().querySelector('.result')?.textContent).toBe('Hello, how are you?'));
-    expect(requests).toEqual([{ text: 'Salom, yaxshimisan?', source: 'auto', target: 'en' }]);
+    expect(requests).toEqual([{ text: 'Salom, yaxshimisan?', source: 'uz', target: 'en' }]);
     expect(textarea.value).toBe('Salom, yaxshimisan?');
 
     buttonByText('Replace')!.click();
@@ -240,7 +243,7 @@ describe('floating DM panels', () => {
 
     button('.translate')!.click();
     await vi.waitFor(() => expect(shadow().querySelector('.result')?.textContent).toBe('Hello, how are you?'));
-    expect(requests).toEqual([{ text: 'Salom, yaxshimisan?', source: 'auto', target: 'en' }]);
+    expect(requests).toEqual([{ text: 'Salom, yaxshimisan?', source: 'uz', target: 'en' }]);
 
     buttonByText('Replace')!.click();
     await vi.waitFor(() => expect(buttonByText('Undo')).not.toBeNull());
@@ -300,11 +303,14 @@ describe('floating DM panels', () => {
     focus(textarea);
     await vi.waitFor(() => expect(button('.translate')).not.toBeNull());
 
-    // A minimized panel stays in the DOM but renders no boxes.
-    const bar = panel.querySelector<HTMLElement>('.composer-bar')!;
-    vi.spyOn(bar, 'getClientRects').mockReturnValue([] as unknown as DOMRectList);
+    // A minimized panel stays in the DOM, but nothing inside it renders boxes.
+    const getClientRects = Element.prototype.getClientRects;
+    vi.spyOn(Element.prototype, 'getClientRects').mockImplementation(function (this: Element) {
+      return panel.contains(this) ? ([] as unknown as DOMRectList) : getClientRects.call(this);
+    });
     window.dispatchEvent(new Event('resize'));
-    expect(hosts()[0]!.style.getPropertyValue('display')).toBe('none');
+    // Resize handling is coalesced into the next animation frame.
+    await vi.waitFor(() => expect(hosts()[0]!.style.getPropertyValue('display')).toBe('none'));
   });
 
   it('ignores the comment box and search field on the page behind the panel', async () => {
@@ -315,5 +321,135 @@ describe('floating DM panels', () => {
       await new Promise((resolve) => setTimeout(resolve, 30));
       expect(button('.translate')).toBeNull();
     }
+  });
+});
+
+describe('translation panel behaviour', () => {
+  async function openPanel(value = 'Salom, yaxshimisan?') {
+    const textarea = mountComposer(value);
+    start();
+    focus(textarea);
+    await vi.waitFor(() => expect(button('.launcher')).not.toBeNull());
+    button('.launcher')!.click();
+    return textarea;
+  }
+  const select = (label: string) => shadow().querySelector<HTMLSelectElement>(`[aria-label="${label}"]`)!;
+  const choose = (label: string, value: string) => {
+    const element = select(label);
+    element.value = value;
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+
+  it('shows the active provider and hides language detection for MyMemory', async () => {
+    await openPanel();
+    await vi.waitFor(() => expect(shadow().querySelector('.result')).not.toBeNull());
+    expect(shadow().querySelector('.provider')!.textContent).toBe('MyMemory');
+    expect(Array.from(select('Translate from').options).map((option) => option.value)).not.toContain('auto');
+    expect(requests[0]!.source).toBe('uz');
+  });
+
+  it('switches to auto-detection when the Google Cloud provider is selected', async () => {
+    await translationProviderSetting.setValue('remote');
+    await openPanel();
+    await vi.waitFor(() => expect(shadow().querySelector('.result')).not.toBeNull());
+    expect(shadow().querySelector('.provider')!.textContent).toBe('Google Cloud');
+    expect(requests[0]!.source).toBe('auto');
+    expect(shadow().querySelector('.meta')!.textContent).toBe('Detected Oʻzbekcha');
+  });
+
+  it('re-translates when the target language changes in the open panel', async () => {
+    await openPanel();
+    await vi.waitFor(() => expect(requests).toHaveLength(1));
+    choose('Translate to', 'ru');
+    await vi.waitFor(() => expect(requests).toHaveLength(2));
+    expect(requests[1]).toMatchObject({ source: 'uz', target: 'ru' });
+    expect(await fakeBrowser.storage.sync.get('targetLanguage')).toEqual({ targetLanguage: 'ru' });
+  });
+
+  it('swaps languages, persists them, and translates with the new pair', async () => {
+    await openPanel('Hello');
+    await vi.waitFor(() => expect(shadow().querySelector('.result')).not.toBeNull());
+    shadow().querySelector<HTMLButtonElement>('[aria-label="Swap languages"]')!.click();
+    await vi.waitFor(() => expect(requests).toHaveLength(2));
+    expect(requests[1]).toMatchObject({ source: 'en', target: 'uz' });
+    expect(await fakeBrowser.storage.sync.get(['sourceLanguage', 'targetLanguage'])).toEqual({ sourceLanguage: 'en', targetLanguage: 'uz' });
+  });
+
+  it('shows an unchanged translation with a notice and no Replace', async () => {
+    respond = async (request) => ({ ok: true, result: { translatedText: request.text, detectedSourceLanguage: request.source, provider: 'mymemory' } });
+    await openPanel('Telegram');
+    await vi.waitFor(() => expect(shadow().querySelector('.notice')?.textContent).toMatch(/same as your text/));
+    expect(buttonByText('Replace')).toBeNull();
+    expect(buttonByText('Copy')).not.toBeNull();
+  });
+
+  it.each([
+    ['offline', 'Could not reach the translation server'],
+    ['timeout', 'took too long'],
+    ['quota_exceeded', 'monthly translation limit'],
+    ['language_pair_unavailable', 'does not support this language pair'],
+  ] as const)('explains a %s error, keeps the draft, and retries on request', async (code, message) => {
+    respond = async () => ({ ok: false, error: { code } });
+    const textarea = await openPanel('Salom');
+    await vi.waitFor(() => expect(shadow().querySelector('[role="alert"]')?.textContent).toContain(message));
+    expect(textarea.value).toBe('Salom');
+
+    buttonByText('Try again')!.click();
+    await vi.waitFor(() => expect(requests).toHaveLength(2));
+  });
+
+  it('shows provider-specific error messages such as the MyMemory quota hint', async () => {
+    respond = async () => ({ ok: false, error: { code: 'quota_exceeded', message: 'MyMemory’s free daily limit is used up. Add a contact email…' } });
+    await openPanel();
+    await vi.waitFor(() => expect(shadow().querySelector('[role="alert"]')?.textContent).toMatch(/MyMemory’s free daily limit/));
+  });
+
+  it('closes on Cancel and on Escape without sending more requests', async () => {
+    await openPanel();
+    await vi.waitFor(() => expect(shadow().querySelector('.result')).not.toBeNull());
+    buttonByText('Cancel')!.click();
+    await vi.waitFor(() => expect(button('.launcher')).not.toBeNull());
+
+    button('.launcher')!.click();
+    await vi.waitFor(() => expect(shadow().querySelector('[role="dialog"]')).not.toBeNull());
+    shadow().querySelector('[role="dialog"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await vi.waitFor(() => expect(button('.launcher')).not.toBeNull());
+    expect(requests).toHaveLength(1); // the second open reused the in-memory result
+  });
+
+  it('moves keyboard focus into the panel when opened from the keyboard, and keeps the controls', async () => {
+    await openPanel(); // .click() has detail 0, like Enter or Space on the button
+    await vi.waitFor(() => expect(shadow().activeElement?.getAttribute('role')).toBe('dialog'));
+    expect(hosts()[0]!.style.getPropertyValue('display')).toBe('block');
+  });
+
+  it('uses the dark theme on a dark page', async () => {
+    document.body.style.backgroundColor = 'rgb(24, 25, 26)';
+    const textarea = mountComposer();
+    start();
+    focus(textarea);
+    await vi.waitFor(() => expect(shadow().querySelector('.translate-root')?.getAttribute('data-theme')).toBe('dark'));
+    document.body.style.backgroundColor = '';
+  });
+
+  it('coalesces bursts of DOM mutations into one update per frame', async () => {
+    const textarea = mountComposer();
+    const findPositioningAnchor = vi.fn(findInstagramComposerPositioningAnchor);
+    const ctx = new ContentScriptContext('instagram');
+    contexts.push(ctx);
+    startFloatingTranslator(ctx, { ...instagram, findPositioningAnchor });
+    focus(textarea);
+    await vi.waitFor(() => expect(button('.launcher')).not.toBeNull());
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)));
+
+    findPositioningAnchor.mockClear();
+    for (let index = 0; index < 200; index += 1) {
+      document.body.append(document.createElement('span'));
+      await Promise.resolve(); // deliver each MutationObserver batch separately
+    }
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    // Previously one anchor lookup per mutation batch (200); now one per frame.
+    expect(findPositioningAnchor.mock.calls.length).toBeLessThanOrEqual(5);
+    expect(findPositioningAnchor.mock.calls.length).toBeGreaterThanOrEqual(1);
   });
 });

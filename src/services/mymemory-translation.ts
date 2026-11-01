@@ -30,10 +30,6 @@ function isTimeout(error: unknown): boolean {
   return error instanceof DOMException && (error.name === 'TimeoutError' || error.name === 'AbortError');
 }
 
-function comparable(text: string): string {
-  return text.normalize('NFC').toLocaleLowerCase().replace(/\s+/g, ' ').trim();
-}
-
 function cleanTranslation(translated: string, sourceText: string): string {
   // Only strip tags MyMemory added, never markup the user typed.
   const withoutPlaceholders = sourceText.includes('<') ? translated : translated.replace(PLACEHOLDER_TAG, '');
@@ -74,10 +70,8 @@ export function parseMyMemoryResponse(body: unknown, request: TranslationRequest
   if (typeof translated !== 'string') throw new TranslationError('invalid_response');
   const translatedText = cleanTranslation(translated, request.text);
   if (!translatedText) throw new TranslationError('empty_translation');
-  // An unchanged echo means MyMemory had nothing for this pair; do not present it as a translation.
-  if (/\p{L}/u.test(request.text) && comparable(translatedText) === comparable(request.text)) {
-    throw new TranslationError('no_translation');
-  }
+  // An unchanged result is returned as is: names, links or "OK" legitimately
+  // stay the same, and the panel flags unchanged text for the user.
 
   return { translatedText, detectedSourceLanguage: request.source, provider: 'mymemory' };
 }

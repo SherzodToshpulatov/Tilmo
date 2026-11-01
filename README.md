@@ -2,7 +2,29 @@
 
 An in-browser translation assistant built with WXT, React, and TypeScript. It
 translates your message draft in place on Telegram Web and Instagram Direct,
-inspired by Gboard Translate.
+inspired by Gboard Translate. Status: public beta preparation (0.1.0).
+
+> **Privacy:** text you translate is sent to the translator you choose
+> (MyMemory by default, a third-party service). Drafts are read only when you
+> press Translate, are never stored, and messages are never sent for you. See
+> [PRIVACY.md](PRIVACY.md).
+
+## How it works
+
+1. Click a supported message box. A small round **Translate message** button
+   appears just above it, on the right.
+2. Press it. A panel opens and translates your draft with your saved languages.
+   It shows the active translator, the languages (with a swap button), and the
+   detected language when the translator reports one.
+3. **Replace** puts the translation into the message box; **Undo** restores your
+   draft. **Copy** copies the translation. **Cancel**, the close button, or
+   Escape closes the panel.
+4. You send the message yourself.
+
+Changing a language in the open panel translates again. If the translation is
+the same as your text (names, links, or a phrase the translator does not know),
+the panel says so instead of offering Replace. The panel follows the page's
+light or dark theme and stays inside the window at any zoom level.
 
 ## Supported sites
 
@@ -13,19 +35,14 @@ inspired by Gboard Translate.
 
 ## Telegram Web
 
-The Telegram Web content script detects the message composer and shows a
-floating **Translate** button with source and target language menus (Oʻzbekcha,
-English, Русский). Translators that can detect languages also offer **Auto** as
-the source. Press **Translate** to preview a translation, then **Replace** the
-draft, **Undo** it, or **Copy** the text.
+Works in Telegram Web K and A, with the Tiptap/ProseMirror composer and
+Telegram's plain editor. Languages: Oʻzbekcha, English, Русский.
 
 ## Instagram Direct
 
-Open a conversation at `https://www.instagram.com/direct/…`, type a message,
-and the same **Translate** controls appear above the message bar (they never
-cover the emoji, attachment or Send buttons). Press **Translate**, check the
-preview, press **Replace**, and send the message yourself. **Undo** restores
-your draft.
+Open a conversation at `https://www.instagram.com/direct/…` and type a
+message: the same Translate button appears above the message bar (never over
+the emoji, attachment or Send buttons).
 
 The same controls work in the floating DM panels that open over Reels, posts,
 profiles and other pages. They follow whichever panel's message box you focus,
@@ -70,12 +87,11 @@ Known limitations:
   panel's composer gets no Translate button, run the diagnostic below.
 - A panel minimized by an animation that keeps its boxes on screen is only
   detected once focus leaves it (clicking elsewhere hides the controls).
-- The panel follows the system light/dark preference, which can differ from
-  Instagram's own theme setting.
 
 ## Translators
 
-Choose one in the extension popup:
+Choose one in the extension popup. MyMemory is the default because it works
+without any setup.
 
 | Translator | Setup | Source language | Limits |
 | --- | --- | --- | --- |
@@ -98,16 +114,20 @@ any origin). Notes:
   only in this browser.
 - MyMemory reports errors inside normal-looking responses. The extension checks
   `responseStatus` and shows a clear message for unsupported language pairs,
-  exhausted quota, empty results, or text returned unchanged — never the error
-  text as a translation.
+  exhausted quota, or empty results — never the error text as a translation.
+- MyMemory sends the draft in the request URL (a GET request), which servers
+  commonly log. See [PRIVACY.md](PRIVACY.md).
 - Results can come from MyMemory's translation memory, so quality varies.
 
-- Text leaves the browser only when you press Translate.
+Safety rules shared by all translators and sites:
+
+- Text leaves the browser only when you press Translate (or change a language in
+  the open panel).
 - Replace is offered only for plain-text drafts. Drafts with links, mentions or
   formatting can be copied but are never overwritten.
 - If the draft changes or you switch chats while a translation is pending,
   Replace and Undo are refused.
-- The extension never sends a Telegram message.
+- The extension never sends a message.
 
 ## Architecture
 
@@ -130,7 +150,10 @@ content script ── message ──▶   background.ts            ─HTTPS─�
   never sees the access token.
 - `src/content/floating-translator.tsx` – the shared floating controls: Shadow
   DOM host, positioning, translate/Replace/Undo flow, navigation and
-  draft-change protection. Each site's content script
+  draft-change protection. DOM mutations and scrolling are coalesced into one
+  update per animation frame. `layout.ts` holds the positioning math and
+  `theme.ts` the light/dark detection. `src/components/TranslatePanel.tsx` is the
+  UI, styled only with extension-owned tokens inside the Shadow DOM. Each site's content script
   (`entrypoints/telegram.content.tsx`, `entrypoints/instagram.content.tsx`)
   passes in its editor adapter and composer finders.
 - `src/adapters/telegram.ts`, `src/adapters/instagram.ts` – site-specific
@@ -215,6 +238,9 @@ Object, abuse monitoring, and a privacy policy. Rotate any MVP tokens at that po
 
 ## Setup
 
+The extension works with MyMemory out of the box: build it (step 3) and load it.
+Steps 1, 2 and 4 are only needed for the optional Google Cloud translator.
+
 ### 1. Google Cloud
 
 1. In the [Google Cloud console](https://console.cloud.google.com/), create or
@@ -262,10 +288,13 @@ Load `.output/chrome-mv3-dev` at `chrome://extensions` (Developer mode → *Load
 unpacked*) if WXT did not open a browser for you. Keep `npm run dev` running
 while you use the dev build; it connects to the dev server on port 3000.
 
-Open the extension popup, choose **Google Cloud (your server)**, enter
+For a production build, run `npm run build` and load `.output/chrome-mv3`.
+
+MyMemory is selected by default. To use your local server instead, open the
+extension popup, choose **Google Cloud (your server)**, enter
 `http://localhost:8787` and the access token, press **Save**, and allow access
 to the server when Chrome asks. Choose **Demo (offline, not real)** to try the
-UI without a server; demo results are labelled as such.
+UI without any network; demo results are labelled as such.
 
 ### 4. Deploy the Worker
 
@@ -386,3 +415,13 @@ detection rules match — no message text, names or labels:
 
 Run `npm run cf-typegen` in `apps/api` after changing `wrangler.jsonc` bindings
 or vars.
+
+## Releasing
+
+- [docs/release-checklist.md](docs/release-checklist.md) — build, manifest and
+  manual browser checks for each release.
+- [docs/chrome-web-store.md](docs/chrome-web-store.md) — draft store listing,
+  permission justifications, data disclosures and asset specifications.
+- Icons are generated from `assets/brand/icon.svg` with `npm run icons`
+  (requires a local Google Chrome).
+- The project has no license file yet; choose one before publishing.

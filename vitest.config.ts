@@ -5,6 +5,6 @@ export default defineConfig({
   plugins: [WxtVitest()],
   test: {
     // The Worker backend in apps/api has its own test setup.
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.{ts,tsx}'],
   },
 });

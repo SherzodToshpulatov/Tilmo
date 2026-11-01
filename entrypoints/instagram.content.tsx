@@ -17,6 +17,7 @@ export default defineContentScript({
       findComposer: findInstagramComposer,
       findFocusedComposer: findFocusedInstagramComposer,
       findPositioningAnchor: findInstagramComposerPositioningAnchor,
+      accentColor: '#0095f6',
     });
   },
 });

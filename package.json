@@ -1,8 +1,8 @@
 {
-  "name": "wxt-react-starter",
-  "description": "manifest.json description",
+  "name": "browser-translator",
+  "description": "Translate your Telegram Web and Instagram Direct drafts before you send them.",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",
@@ -14,7 +14,8 @@
     "compile": "tsc --noEmit",
     "postinstall": "wxt prepare",
     "test": "vitest run",
-    "test:live": "MYMEMORY_LIVE=1 vitest run src/services/mymemory-translation.live.test.ts"
+    "test:live": "MYMEMORY_LIVE=1 vitest run src/services/mymemory-translation.live.test.ts",
+    "icons": "node scripts/render-icons.mjs assets/brand/icon.svg public/icon"
   },
   "dependencies": {
     "react": "^19.2.4",

@@ -14,8 +14,9 @@ export const sourceLanguageSetting = storage.defineItem<SourceLanguage>('sync:so
 });
 
 // Connection settings stay in local storage so the access token is not synced.
+// MyMemory is the default because it works without any setup.
 export const translationProviderSetting = storage.defineItem<TranslationProviderSetting>('local:translationProvider', {
-  fallback: 'remote',
+  fallback: 'mymemory',
 });
 
 export const apiBaseUrlSetting = storage.defineItem<string>('local:apiBaseUrl', {

@@ -15,6 +15,7 @@ export default defineContentScript({
       findComposer: findTelegramComposer,
       findFocusedComposer: findFocusedTelegramComposer,
       findPositioningAnchor: findTelegramComposerPositioningAnchor,
+      accentColor: '#3390ec',
     });
   },
 });
