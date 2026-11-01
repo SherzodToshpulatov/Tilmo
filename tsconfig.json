@@ -3,5 +3,7 @@
   "compilerOptions": {
     "allowImportingTsExtensions": true,
     "jsx": "react-jsx"
-  }
+  },
+  // The Worker backend has its own tsconfig with Workers runtime types.
+  "exclude": ["node_modules", ".output", "apps"]
 }

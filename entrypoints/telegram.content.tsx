@@ -6,9 +6,24 @@ import {
   findTelegramComposerPositioningAnchor,
 } from '../src/adapters/telegram';
 import { DraftManager, type DraftSnapshot } from '../src/core/draft-manager';
-import { mockTranslationService } from '../src/services/translation';
+import {
+  DEFAULT_TARGET_LANGUAGE,
+  isSourceLanguage,
+  isSupportedLanguage,
+  resolveSourceLanguage,
+  type LanguageCode,
+  type SourceLanguage,
+} from '../src/core/languages';
+import { TRANSLATION_PROVIDERS, isTranslationProviderId } from '../src/services/providers';
+import { TranslationError, TRANSLATION_ERROR_MESSAGES, type TranslationResult } from '../src/services/translation';
 import { TelegramTranslatePanel, type PanelState } from '../src/components/TelegramTranslatePanel';
-import { TRANSLATE_DRAFT_MESSAGE } from '../src/utils/messaging';
+import { TRANSLATE_DRAFT_MESSAGE, requestTranslation } from '../src/utils/messaging';
+import {
+  sourceLanguageSetting,
+  targetLanguageSetting,
+  translationProviderSetting,
+  type TranslationProviderSetting,
+} from '../src/utils/settings';
 
 const INITIAL_PANEL_STATE: PanelState = {
   status: 'idle',
@@ -32,6 +47,13 @@ export default defineContentScript({
     let pendingSnapshot: DraftSnapshot | null = null;
     let pendingLocation: string | null = null;
     let undoLocation: string | null = null;
+    let targetLanguage: LanguageCode = DEFAULT_TARGET_LANGUAGE;
+    let storedSourceLanguage: SourceLanguage = 'auto';
+    let provider: TranslationProviderSetting = translationProviderSetting.fallback;
+    // In-memory only, so re-translating an unchanged draft costs no request.
+    let lastTranslation: { key: string; result: TranslationResult } | null = null;
+    const sourceLanguage = () =>
+      resolveSourceLanguage(storedSourceLanguage, targetLanguage, TRANSLATION_PROVIDERS[provider].supportsAutoDetect);
     let lastPositionDiagnostic = '';
     const resizeObserver = new ResizeObserver(() => positionUi());
 
@@ -62,6 +84,11 @@ export default defineContentScript({
         <TelegramTranslatePanel
           visible={activeEditor !== null}
           state={panelState}
+          sourceLanguage={sourceLanguage()}
+          supportsAutoDetect={TRANSLATION_PROVIDERS[provider].supportsAutoDetect}
+          targetLanguage={targetLanguage}
+          onSourceLanguageChange={changeSourceLanguage}
+          onTargetLanguageChange={changeTargetLanguage}
           onTranslate={() => void translateDraft()}
           onReplace={() => void replaceDraft()}
           onUndo={() => void undoReplacement()}
@@ -186,6 +213,8 @@ export default defineContentScript({
     async function translateDraft() {
       const editor = activeEditor;
       if (!editor?.isConnected) return;
+      // Ignore repeated clicks or shortcut presses while a request is in flight.
+      if (panelState.status === 'loading' || panelState.status === 'replacing') return;
 
       const snapshot: DraftSnapshot = draftManager.capture(editor);
       if (!snapshot.text.trim()) {
@@ -200,12 +229,19 @@ export default defineContentScript({
       pendingLocation = location.href;
       const requestLocation = pendingLocation;
       const currentRequest = ++requestId;
+      const target = targetLanguage;
+      const source = sourceLanguage();
+      const cacheKey = JSON.stringify([provider, source, target, snapshot.text]);
       panelState = { ...INITIAL_PANEL_STATE, status: 'loading' };
       render();
 
       try {
-        const translation = await mockTranslationService.translate(snapshot.text);
+        const result = lastTranslation?.key === cacheKey
+          ? lastTranslation.result
+          : await requestTranslation({ text: snapshot.text, source, target });
         if (currentRequest !== requestId) return;
+        lastTranslation = { key: cacheKey, result };
+        const translation = result.translatedText;
         if (activeEditor !== editor || location.href !== requestLocation || !draftManager.isUnchanged(snapshot)) {
           pendingSnapshot = null;
           pendingLocation = null;
@@ -223,15 +259,54 @@ export default defineContentScript({
           translation,
           canReplace: draftManager.canReplace(snapshot, translation),
           error: '',
+          detectedSourceLanguage: result.detectedSourceLanguage,
+          translationTarget: target,
+          provider: result.provider,
         };
         render();
-      } catch {
+      } catch (error) {
         if (currentRequest !== requestId) return;
         pendingSnapshot = null;
         pendingLocation = null;
-        panelState = { ...INITIAL_PANEL_STATE, status: 'error', error: 'The demo translation could not be completed.' };
+        // The draft is untouched on failure; only the panel shows the error.
+        const message = error instanceof TranslationError ? error.message : TRANSLATION_ERROR_MESSAGES.server_error;
+        panelState = { ...INITIAL_PANEL_STATE, status: 'error', error: message };
         render();
       }
+    }
+
+    function onLanguagesChanged() {
+      // A preview or pending request for the old languages no longer applies.
+      // Keep a completed replacement so Undo stays available.
+      if (panelState.status === 'loading' || panelState.status === 'preview' || panelState.status === 'error') {
+        cancelPreview();
+      } else {
+        render();
+      }
+    }
+
+    function changeTargetLanguage(language: LanguageCode) {
+      if (!isSupportedLanguage(language) || language === targetLanguage) return;
+      // Picking the current source as the target swaps the pair.
+      if (language === sourceLanguage()) {
+        storedSourceLanguage = targetLanguage;
+        void sourceLanguageSetting.setValue(storedSourceLanguage);
+      }
+      targetLanguage = language;
+      void targetLanguageSetting.setValue(language);
+      onLanguagesChanged();
+    }
+
+    function changeSourceLanguage(language: SourceLanguage) {
+      if (!isSourceLanguage(language) || language === sourceLanguage()) return;
+      if (language === targetLanguage) {
+        const previous = sourceLanguage();
+        targetLanguage = previous !== 'auto' ? previous : language === 'en' ? 'uz' : 'en';
+        void targetLanguageSetting.setValue(targetLanguage);
+      }
+      storedSourceLanguage = language;
+      void sourceLanguageSetting.setValue(language);
+      onLanguagesChanged();
     }
 
     async function replaceDraft() {
@@ -327,6 +402,7 @@ export default defineContentScript({
     const onLocationChange = () => {
       pendingLocation = null;
       undoLocation = null;
+      lastTranslation = null;
       setActiveEditor(null);
       ctx.requestAnimationFrame(() => {
         const editor = findFocusedTelegramComposer();
@@ -359,6 +435,32 @@ export default defineContentScript({
     ctx.addEventListener(window, 'wxt:locationchange', onLocationChange);
     browser.runtime.onMessage.addListener(onRuntimeMessage);
     observer.observe(document.documentElement, { childList: true, subtree: true });
+    const applyStoredTargetLanguage = (language: LanguageCode | null) => {
+      const next = isSupportedLanguage(language) ? language : DEFAULT_TARGET_LANGUAGE;
+      if (next === targetLanguage) return;
+      targetLanguage = next;
+      render();
+    };
+    const applyStoredSourceLanguage = (language: SourceLanguage | null) => {
+      const next = isSourceLanguage(language) ? language : 'auto';
+      if (next === storedSourceLanguage) return;
+      storedSourceLanguage = next;
+      render();
+    };
+    const applyStoredProvider = (value: TranslationProviderSetting | null) => {
+      const next = isTranslationProviderId(value) ? value : translationProviderSetting.fallback;
+      if (next === provider) return;
+      provider = next;
+      onLanguagesChanged();
+    };
+    void targetLanguageSetting.getValue().then(applyStoredTargetLanguage, () => {});
+    void sourceLanguageSetting.getValue().then(applyStoredSourceLanguage, () => {});
+    void translationProviderSetting.getValue().then(applyStoredProvider, () => {});
+    const unwatchSettings = [
+      targetLanguageSetting.watch(applyStoredTargetLanguage),
+      sourceLanguageSetting.watch(applyStoredSourceLanguage),
+      translationProviderSetting.watch(applyStoredProvider),
+    ];
     const initiallyFocusedEditor = findFocusedTelegramComposer();
     if (initiallyFocusedEditor) setActiveEditor(initiallyFocusedEditor);
 
@@ -395,6 +497,8 @@ export default defineContentScript({
       window.visualViewport?.removeEventListener('scroll', onScrollOrResize);
       window.visualViewport?.removeEventListener('resize', onScrollOrResize);
       browser.runtime.onMessage.removeListener(onRuntimeMessage);
+      unwatchSettings.forEach((unwatch) => unwatch());
+      lastTranslation = null;
       observer.disconnect();
       resizeObserver.disconnect();
       root?.unmount();

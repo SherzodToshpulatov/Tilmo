@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "browser-translator-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-20",
+  // Non-secret limits. Secrets (GOOGLE_TRANSLATE_API_KEY,
+  // API_ACCESS_TOKEN_HASHES) are set with `wrangler secret put` or .dev.vars.
+  "vars": {
+    "SUPPORTED_LANGUAGES": "uz,en,ru",
+    "MAX_TEXT_CHARS": "2000",
+    "MAX_BODY_BYTES": "16384",
+    "MONTHLY_CHARACTER_LIMIT": "400000",
+    "PROVIDER_TIMEOUT_MS": "8000"
+  },
+  // Per-token request throttling. Cloudflare rate limiting is approximate and
+  // per location; the monthly character budget below is the strict cost guard.
+  "ratelimits": [
+    {
+      "name": "TRANSLATE_RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 20, "period": 60 }
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "USAGE_LIMITER", "class_name": "UsageLimiter" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["UsageLimiter"] }]
+}

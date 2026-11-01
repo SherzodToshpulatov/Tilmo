@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { LANGUAGES, languageLabel, type LanguageCode, type SourceLanguage } from '../core/languages';
 
 export type PanelStatus = 'idle' | 'loading' | 'replacing' | 'preview' | 'replaced' | 'error';
 
@@ -7,11 +8,21 @@ export interface PanelState {
   translation: string;
   canReplace: boolean;
   error: string;
+  detectedSourceLanguage?: string;
+  /** Target language of the shown translation. */
+  translationTarget?: string;
+  provider?: string;
 }
 
 interface TelegramTranslatePanelProps {
   visible: boolean;
   state: PanelState;
+  sourceLanguage: SourceLanguage;
+  /** Offer "Auto" only when the selected translator can detect languages. */
+  supportsAutoDetect: boolean;
+  targetLanguage: LanguageCode;
+  onSourceLanguageChange: (language: SourceLanguage) => void;
+  onTargetLanguageChange: (language: LanguageCode) => void;
   onTranslate: () => void;
   onReplace: () => void;
   onUndo: () => void;
@@ -23,7 +34,11 @@ const styles = `
   :host { all: initial; color-scheme: light dark; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
   * { box-sizing: border-box; }
   .telegram-translate-root { display: flex; flex-direction: column; align-items: flex-end; width: max-content; max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); overflow-y: auto; pointer-events: none; }
-  .launcher { position: relative; display: flex; justify-content: flex-end; pointer-events: none; }
+  .launcher { position: relative; display: flex; justify-content: flex-end; gap: 6px; pointer-events: none; }
+  .target { height: 33px; padding: 0 8px; color: var(--tg-theme-text-color, #222); background: var(--tg-theme-bg-color, #fff); border: 1px solid #8886; border-radius: 9px; box-shadow: 0 2px 8px #0002; font: 600 12px/1.2 system-ui, sans-serif; cursor: pointer; pointer-events: auto; }
+  .target:disabled { opacity: .65; cursor: wait; }
+  .arrow { align-self: center; color: #8a8a8a; font: 600 12px/1 system-ui, sans-serif; text-shadow: 0 0 3px var(--tg-theme-bg-color, #fff); }
+  .meta { margin: 0 0 6px; color: #8a8a8a; font: 600 11px/1.3 system-ui, sans-serif; letter-spacing: .02em; }
   button { border: 0; border-radius: 9px; font: 600 13px/1.2 system-ui, sans-serif; cursor: pointer; }
   .translate { display: inline-flex; align-items: center; gap: 7px; padding: 9px 12px; color: #fff; background: #3390ec; box-shadow: 0 2px 8px #0003; white-space: nowrap; pointer-events: auto; }
   .translate:hover { background: #267dce; }
@@ -41,6 +56,11 @@ const styles = `
 export function TelegramTranslatePanel({
   visible,
   state,
+  sourceLanguage,
+  supportsAutoDetect,
+  targetLanguage,
+  onSourceLanguageChange,
+  onTargetLanguageChange,
   onTranslate,
   onReplace,
   onUndo,
@@ -62,6 +82,35 @@ export function TelegramTranslatePanel({
     <div className="telegram-translate-root">
       <style>{styles}</style>
       <div className="launcher">
+        <select
+          className="target"
+          aria-label="Translate from"
+          title="Translate from"
+          value={sourceLanguage}
+          disabled={state.status === 'replacing'}
+          onKeyDown={(event) => event.stopPropagation()}
+          onChange={(event) => onSourceLanguageChange(event.target.value as SourceLanguage)}
+        >
+          {supportsAutoDetect && <option value="auto">Auto</option>}
+          {LANGUAGES.map((language) => (
+            <option key={language.code} value={language.code}>{language.label}</option>
+          ))}
+        </select>
+        <span className="arrow" aria-hidden="true">→</span>
+        <select
+          className="target"
+          aria-label="Translate to"
+          title="Translate to"
+          value={targetLanguage}
+          disabled={state.status === 'replacing'}
+          // Keep Telegram's global shortcuts from reacting to keys in the menu.
+          onKeyDown={(event) => event.stopPropagation()}
+          onChange={(event) => onTargetLanguageChange(event.target.value as LanguageCode)}
+        >
+          {LANGUAGES.map((language) => (
+            <option key={language.code} value={language.code}>{language.label}</option>
+          ))}
+        </select>
         <button className="translate" type="button" disabled={state.status === 'loading' || state.status === 'replacing'} onMouseDown={(event) => event.preventDefault()} onClick={onTranslate}>
           <span className="icon" aria-hidden="true">文</span>
           {state.status === 'loading' ? 'Translating…' : state.status === 'replacing' ? 'Updating draft…' : 'Translate'}
@@ -69,6 +118,13 @@ export function TelegramTranslatePanel({
       </div>
       {(state.status === 'preview' || state.status === 'replacing' || state.status === 'replaced' || state.status === 'error') && (
         <section className="panel" aria-live="polite">
+          {state.translation && state.translationTarget && (
+            <p className="meta">
+              {state.detectedSourceLanguage ? languageLabel(state.detectedSourceLanguage) : 'Auto-detected'}
+              {' → '}{languageLabel(state.translationTarget)}
+              {state.provider === 'mock' && ' · Demo translation'}
+            </p>
+          )}
           {state.translation && <p className="result">{state.translation}</p>}
           {state.status === 'preview' && !state.canReplace && (
             <p className="hint">Safe replacement is unavailable for this editor or rich-text draft. Copy the preview instead.</p>
