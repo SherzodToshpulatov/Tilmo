@@ -206,7 +206,7 @@ export function startFloatingTranslator(ctx: ContentScriptContext, site: Floatin
       };
       const diagnosticKey = JSON.stringify(diagnostics);
       if (diagnosticKey !== lastPositionDiagnostic) {
-        console.debug(`[Browser Translator] ${site.name} floating UI geometry`, diagnostics);
+        console.debug(`[Tilmo] ${site.name} floating UI geometry`, diagnostics);
         lastPositionDiagnostic = diagnosticKey;
       }
     }

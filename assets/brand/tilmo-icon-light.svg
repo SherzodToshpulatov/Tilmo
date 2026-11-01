@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title id="title">Tilmo</title>
+  <!-- App icon on a light tile, for dark backgrounds or light-themed listings. -->
+  <rect x="4.5" y="4.5" width="119" height="119" rx="27.5" fill="#F8FAFC" stroke="#E2E8F0"/>
+  <rect x="56" y="38" width="16" height="60" rx="8" fill="#0F172A"/>
+  <rect x="60" y="38" width="44" height="16" rx="8" fill="#0F172A"/>
+  <rect x="24" y="30" width="48" height="16" rx="8" fill="#22D3EE"/>
+</svg>

@@ -1,6 +1,6 @@
-// Renders assets/brand/icon.svg to public/icon/{16,32,48,96,128}.png with a
-// transparent background, using a local Google Chrome in headless mode.
-// Usage: node scripts/render-icons.mjs assets/brand/icon.svg public/icon
+// Renders an icon SVG (128×128 viewBox) to public/icon/{16,32,48,96,128}.png
+// with a transparent background, using a local Google Chrome in headless mode.
+// Usage: node scripts/render-icons.mjs assets/brand/tilmo-icon-dark.svg public/icon
 import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -20,8 +20,7 @@ try {
   const send = (method, params = {}) => new Promise((r) => { pending.set(++id, r); ws.send(JSON.stringify({ id, method, params })); });
   await send('Emulation.setDefaultBackgroundColorOverride', { color: { r: 0, g: 0, b: 0, a: 0 } });
   for (const size of [16, 32, 48, 96, 128]) {
-    // Thicker strokes keep the glyph legible at toolbar sizes.
-    const svg = source.replace('stroke-width="1.9"', `stroke-width="${size <= 32 ? 2.6 : 1.9}"`).replace('width="128" height="128"', `width="${size}" height="${size}"`)
+    const svg = source.replace('width="128" height="128"', `width="${size}" height="${size}"`)
       // Chrome Web Store: 96px artwork with 16px transparent padding in the 128px icon.
       .replace('viewBox="0 0 128 128"', size === 128 ? 'viewBox="-16 -16 160 160"' : 'viewBox="0 0 128 128"');
     const html = `<html><body style="margin:0;background:transparent">${svg}</body></html>`;

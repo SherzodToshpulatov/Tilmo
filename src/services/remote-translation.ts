@@ -50,7 +50,7 @@ function parseResult(body: unknown): TranslationResult {
   return { translatedText, detectedSourceLanguage, provider };
 }
 
-/** Calls the Browser Translator backend (`POST /v1/translate`). */
+/** Calls the Tilmo backend (`POST /v1/translate`). */
 export class RemoteTranslationService implements TranslationService {
   private readonly endpoint: string;
   private readonly timeoutMs: number;

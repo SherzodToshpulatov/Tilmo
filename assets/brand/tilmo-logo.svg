@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title id="title">Tilmo</title>
+  <style>.ink{fill:#0F172A}.ink-line{stroke:#0F172A}@media (prefers-color-scheme: dark){.ink{fill:#F8FAFC}.ink-line{stroke:#F8FAFC}}</style>
+  <!-- Tilmo symbol: a T whose crossbar is split into two offset halves, switching between languages. -->
+  <rect x="56" y="38" width="16" height="60" rx="8" class="ink"/>
+  <rect x="60" y="38" width="44" height="16" rx="8" class="ink"/>
+  <rect x="24" y="30" width="48" height="16" rx="8" fill="#22D3EE"/>
+</svg>

@@ -20,7 +20,7 @@ export const TRANSLATION_PROVIDERS: Record<TranslationProviderId, TranslationPro
   remote: {
     label: 'Google Cloud (your server)',
     shortLabel: 'Google Cloud',
-    description: 'Google Cloud Translation through your own Browser Translator server. Detects the language automatically.',
+    description: 'Google Cloud Translation through your own Tilmo server. Detects the language automatically.',
     supportsAutoDetect: true,
   },
   mock: {

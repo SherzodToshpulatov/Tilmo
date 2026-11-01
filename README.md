@@ -1,8 +1,15 @@
-# Browser Translator
+<p align="center">
+  <img src="assets/brand/tilmo-wordmark.svg" alt="Tilmo" width="280">
+</p>
 
-An in-browser translation assistant built with WXT, React, and TypeScript. It
-translates your message draft in place on Telegram Web and Instagram Direct,
-inspired by Gboard Translate. Status: public beta preparation (0.1.0).
+<p align="center"><strong>Translate where you type.</strong></p>
+
+# Tilmo
+
+Tilmo is an open-source browser extension, built with WXT, React and
+TypeScript, that translates your message draft in place on Telegram Web and
+Instagram Direct, inspired by Gboard Translate. Status: public beta
+preparation (0.1.0).
 
 > **Privacy:** text you translate is sent to the translator you choose
 > (MyMemory by default, a third-party service). Drafts are read only when you
@@ -422,6 +429,29 @@ or vars.
   manual browser checks for each release.
 - [docs/chrome-web-store.md](docs/chrome-web-store.md) — draft store listing,
   permission justifications, data disclosures and asset specifications.
-- Icons are generated from `assets/brand/icon.svg` with `npm run icons`
-  (requires a local Google Chrome).
+- Icons are generated from `assets/brand/tilmo-icon-dark.svg` with
+  `npm run icons` (requires a local Google Chrome). See [Brand](#brand).
 - The project has no license file yet; choose one before publishing.
+
+## Brand
+
+The Tilmo mark is a **T** whose crossbar is split into two halves at slightly
+different heights — one cyan, one solid — a quiet nod to switching between
+languages. It is built from three rounded rectangles on a 128-unit grid with
+16-unit strokes, so it stays a recognisable T at 16×16.
+
+| File | Use |
+| --- | --- |
+| `assets/brand/tilmo-logo.svg` | Primary symbol, transparent background (navy, or light in dark mode) |
+| `assets/brand/tilmo-wordmark.svg` | Symbol with the "Tilmo" lettering, drawn as vector strokes |
+| `assets/brand/tilmo-icon-dark.svg` | App icon on a navy tile — source for `public/icon/*.png` |
+| `assets/brand/tilmo-icon-light.svg` | App icon on a light tile |
+
+Palette: cyan `#22D3EE`, navy `#0F172A`, light `#F8FAFC`. Cyan is used as a
+fill or on navy; on light backgrounds, text and focus rings use the deeper
+`#0E7490`, because `#22D3EE` on white is below the 3:1 contrast minimum.
+
+Internal identifiers keep the original project name so existing setups keep
+working: the GitHub repository, the `browser-translator-api` Worker (its name
+is part of its deployed URL), and the floating UI's DOM id.
+

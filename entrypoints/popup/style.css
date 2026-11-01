@@ -1,14 +1,19 @@
-/* Same token values as the floating panel (src/components/TranslatePanel.tsx). */
+/* Tilmo palette: cyan #22D3EE, navy #0F172A, light #F8FAFC. */
 :root {
-  --bg: #ffffff;
-  --text: #1c1e21;
-  --muted: #65676b;
-  --subtle: #f0f2f5;
+  --bg: #f8fafc;
+  --text: #0f172a;
+  --muted: #475569;
+  --subtle: #eef2f6;
   --field-bg: #ffffff;
-  --border: rgba(0, 0, 0, 0.14);
-  --accent: #2f7de1;
-  --success: #1a7f37;
-  --danger: #b3261e;
+  --border: rgba(15, 23, 42, 0.14);
+  /* Cyan is a fill (with navy text); text and focus rings use a deeper cyan
+     because #22D3EE on light backgrounds is below 3:1 contrast. */
+  --accent: #22d3ee;
+  --on-accent: #0f172a;
+  --link: #0e7490;
+  --focus: #0e7490;
+  --success: #15803d;
+  --danger: #b91c1c;
   --notice: #7a4b00;
   --notice-bg: #fff4e0;
 
@@ -22,16 +27,19 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #242526;
-    --text: #e4e6eb;
-    --muted: #b0b3b8;
-    --subtle: #3a3b3c;
-    --field-bg: #3a3b3c;
-    --border: rgba(255, 255, 255, 0.16);
-    --accent: #5aa2f5;
-    --success: #3fb950;
-    --danger: #ffb4ab;
-    --notice: #ffcc80;
+    --bg: #0f172a;
+    --text: #f8fafc;
+    --muted: #94a3b8;
+    --subtle: #1e293b;
+    --field-bg: #1e293b;
+    --border: rgba(248, 250, 252, 0.14);
+    --accent: #22d3ee;
+    --on-accent: #0f172a;
+    --link: #67e8f9;
+    --focus: #22d3ee;
+    --success: #4ade80;
+    --danger: #fca5a5;
+    --notice: #fcd34d;
     --notice-bg: #3a2c12;
   }
 }

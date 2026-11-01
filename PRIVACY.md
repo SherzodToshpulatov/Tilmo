@@ -1,6 +1,6 @@
 # Privacy
 
-Browser Translator helps you translate a message draft before you send it on
+Tilmo helps you translate a message draft before you send it on
 Telegram Web or Instagram. Translating text requires sending it to a
 translation service, so this document explains exactly what is read, where it
 goes, and what is stored.
@@ -32,7 +32,7 @@ chat history, or messages you received.
 | Translator (popup setting) | Recipient | How |
 | --- | --- | --- |
 | **MyMemory (Free)** — default | MyMemory, operated by Translated srl (`api.mymemory.translated.net`) | HTTPS GET request. The draft and language pair are part of the request URL, which servers commonly record in logs. If you enter a contact email, it is sent too (as `de`). |
-| **Google Cloud (your server)** | The Browser Translator server you deploy (`apps/api`), which forwards the text to Google Cloud Translation | HTTPS POST with your access token. The server code in this repository does not log or store text; Google processes it under the Google Cloud terms of your project. |
+| **Google Cloud (your server)** | The Tilmo server you deploy (`apps/api`), which forwards the text to Google Cloud Translation | HTTPS POST with your access token. The server code in this repository does not log or store text; Google processes it under the Google Cloud terms of your project. |
 | **Demo (offline, not real)** | Nobody | Placeholder output is produced locally. |
 
 Requests are made by the extension's background service worker, not by the

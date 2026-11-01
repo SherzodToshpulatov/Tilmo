@@ -34,3 +34,15 @@ export function CloseIcon() {
     </svg>
   );
 }
+
+/** The Tilmo app mark on its navy tile (same geometry as assets/brand/tilmo-icon-dark.svg). */
+export function TilmoMark({ size = 32 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 128 128" aria-hidden="true" focusable="false">
+      <rect x="4" y="4" width="120" height="120" rx="28" fill="#0F172A" />
+      <rect x="56" y="38" width="16" height="60" rx="8" fill="#F8FAFC" />
+      <rect x="60" y="38" width="44" height="16" rx="8" fill="#F8FAFC" />
+      <rect x="24" y="30" width="48" height="16" rx="8" fill="#22D3EE" />
+    </svg>
+  );
+}

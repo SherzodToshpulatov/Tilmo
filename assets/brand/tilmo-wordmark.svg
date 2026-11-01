@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="128" viewBox="0 0 400 128" role="img" aria-labelledby="title">
+  <title id="title">Tilmo</title>
+  <style>.ink{fill:#0F172A}.ink-line{stroke:#0F172A}@media (prefers-color-scheme: dark){.ink{fill:#F8FAFC}.ink-line{stroke:#F8FAFC}}</style>
+  <!-- Symbol + "Tilmo" lettering drawn as geometric strokes (no font needed). -->
+  <rect x="56" y="38" width="16" height="60" rx="8" class="ink"/>
+  <rect x="60" y="38" width="44" height="16" rx="8" class="ink"/>
+  <rect x="24" y="30" width="48" height="16" rx="8" fill="#22D3EE"/>
+  <g class="ink-line" fill="none" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M140 37h48M164 37v54"/>
+    <path d="M210 62v29"/>
+    <path d="M238 34v57"/>
+    <path d="M266 91V62M266 76a13 13 0 0 1 26 0v15M292 76a13 13 0 0 1 26 0v15"/>
+    <circle cx="356" cy="76.5" r="15"/>
+  </g>
+  <circle cx="210" cy="38" r="8" fill="#22D3EE"/>
+</svg>

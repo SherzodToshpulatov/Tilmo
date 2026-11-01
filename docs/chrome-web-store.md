@@ -5,11 +5,11 @@ developer account has been registered.
 
 ## Listing
 
-**Name:** Browser Translator
+**Name:** Tilmo
 
 **Summary** (132 characters max):
 
-> Translate your message drafts on Telegram Web and Instagram before you send them. Preview, replace, and undo in place.
+> Translate where you type: translate your drafts on Telegram Web and Instagram before you send them. Preview, replace, undo.
 
 **Category:** Productivity (alternative: Communication)
 
@@ -19,7 +19,7 @@ developer account has been registered.
 
 > Write in one language, send in another — without leaving the chat.
 >
-> Browser Translator adds a small Translate button next to the message box on
+> Tilmo adds a small Translate button next to the message box on
 > Telegram Web and Instagram Direct (including the chat panels that open over
 > Reels, posts and profiles).
 >
@@ -73,10 +73,10 @@ For the "Privacy practices" tab (answer from `PRIVACY.md`):
 
 | Asset | Status | Specification |
 | --- | --- | --- |
-| Store icon | Done: `public/icon/128.png` | 128×128 PNG, 96×96 artwork with 16 px transparent padding. Source: `assets/brand/icon.svg`, rendered with `npm run icons`. |
+| Store icon | Done: `public/icon/128.png` | 128×128 PNG, 96×96 artwork with 16 px transparent padding. Source: `assets/brand/tilmo-icon-dark.svg`, rendered with `npm run icons`. |
 | Toolbar/extension icons | Done: `public/icon/{16,32,48,96}.png` | Same source; thicker strokes at 16 and 32 px. |
 | Screenshots | **Needed** | 1–5 images, 1280×800 (or 640×400) PNG/JPEG. Capture from real signed-in sessions with **test accounts and non-private conversations**: (1) Telegram Web with the Translate button next to the composer, (2) the open panel with a preview, (3) Instagram Direct after Replace showing Undo, (4) a floating Instagram chat panel over a Reel, (5) the settings popup. Blur names and avatars. |
-| Small promo tile | Optional, needed for featuring | 440×280 PNG/JPEG. Icon plus the name and the line "Translate before you send". |
+| Small promo tile | Optional, needed for featuring | 440×280 PNG/JPEG. `tilmo-wordmark.svg` on navy `#0F172A` (light variant) with the tagline "Translate where you type." |
 | Marquee promo tile | Optional | 1400×560 PNG/JPEG. |
 
 No branded artwork beyond the icon has been produced; screenshots must come from

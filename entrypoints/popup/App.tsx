@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { SwapIcon, TranslateIcon } from '@/src/components/icons';
+import { SwapIcon, TilmoMark } from '@/src/components/icons';
 import {
   LANGUAGES,
   resolveSourceLanguage,
@@ -28,7 +28,7 @@ const PROVIDER_IDS = Object.keys(TRANSLATION_PROVIDERS) as TranslationProviderId
 
 const RECIPIENT: Record<TranslationProviderId, string> = {
   mymemory: 'MyMemory (Translated srl)',
-  remote: 'your Browser Translator server and Google Cloud Translation',
+  remote: 'your Tilmo server and Google Cloud Translation',
   mock: 'nowhere — the demo works offline',
 };
 
@@ -136,10 +136,10 @@ function App() {
   return (
     <main>
       <header className="brand">
-        <span className="brand-icon"><TranslateIcon size={20} /></span>
+        <TilmoMark size={36} />
         <div>
-          <h1>Browser Translator</h1>
-          <p>Translate drafts on Telegram Web and Instagram before you send them.</p>
+          <h1>Tilmo</h1>
+          <p>Translate where you type.</p>
         </div>
       </header>
 
@@ -195,7 +195,7 @@ function App() {
                   onChange={(event) => { setBaseUrl(event.target.value); edited(); }}
                 />
                 {errors.url && <p className="field-error" id="url-error">{errors.url}</p>}
-                <p className="hint" id="url-hint">Your deployed Browser Translator server (see the README).</p>
+                <p className="hint" id="url-hint">Your deployed Tilmo server (see the README).</p>
               </div>
               <div className="field">
                 <label htmlFor="token">Access token</label>
