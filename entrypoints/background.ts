@@ -7,7 +7,7 @@ import {
   type TranslationRequest,
   type TranslationResult,
 } from '../src/services/translation';
-import { isTranslateTextMessage, type TranslateTextResponse } from '../src/utils/messaging';
+import { TRANSLATE_DRAFT_MESSAGE, isTranslateTextMessage, type TranslateTextResponse } from '../src/utils/messaging';
 import {
   apiAccessTokenSetting,
   apiBaseUrlSetting,
@@ -15,6 +15,7 @@ import {
   myMemoryEmailSetting,
   translationProviderSetting,
 } from '../src/utils/settings';
+import { isTranslatableTabUrl } from '../src/utils/sites';
 
 async function translate(request: TranslationRequest): Promise<TranslationResult> {
   if (!request.text.trim() || !isSupportedLanguage(request.target) ||
@@ -58,11 +59,12 @@ export default defineBackground(() => {
 
     void browser.tabs.query({ active: true, lastFocusedWindow: true }).then((tabs) => {
       const activeTab = tabs[0];
-      if (!activeTab?.id || !activeTab.url?.startsWith('https://web.telegram.org/')) return;
+      // Each supported site's content script handles the same message for its own composer.
+      if (!activeTab?.id || !isTranslatableTabUrl(activeTab.url)) return;
 
-      return browser.tabs.sendMessage(activeTab.id, { type: 'translate-draft' });
+      return browser.tabs.sendMessage(activeTab.id, { type: TRANSLATE_DRAFT_MESSAGE });
     }).catch(() => {
-      console.warn('Could not deliver the Translate shortcut to the active Telegram tab.');
+      console.warn('Could not deliver the Translate shortcut to the active tab.');
     });
   });
 

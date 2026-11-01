@@ -1,7 +1,15 @@
 # Browser Translator
 
 An in-browser translation assistant built with WXT, React, and TypeScript. It
-translates your Telegram Web draft in place, inspired by Gboard Translate.
+translates your message draft in place on Telegram Web and Instagram Direct,
+inspired by Gboard Translate.
+
+## Supported sites
+
+| Site | URLs | Composer |
+| --- | --- | --- |
+| Telegram Web (K and A) | `https://web.telegram.org/*` | Tiptap/ProseMirror or plain editor |
+| Instagram Direct | `https://www.instagram.com/direct/*` (inbox and conversations) | Lexical editor or textarea |
 
 ## Telegram Web
 
@@ -10,6 +18,43 @@ floating **Translate** button with source and target language menus (Oʻzbekcha,
 English, Русский). Translators that can detect languages also offer **Auto** as
 the source. Press **Translate** or `Ctrl+Shift+Y` to preview a translation, then
 **Replace** the draft, **Undo** it, or **Copy** the text.
+
+## Instagram Direct
+
+Open a conversation at `https://www.instagram.com/direct/…`, type a message,
+and the same **Translate** controls appear above the message bar (they never
+cover the emoji, attachment or Send buttons). Press **Translate** or
+`Ctrl+Shift+Y` (`Command+Shift+Y` on macOS), check the preview, press
+**Replace**, and send the message yourself. **Undo** restores your draft.
+
+The content script is injected on all `www.instagram.com` pages because
+Instagram navigates without reloading, but it does nothing outside `/direct/`
+routes. Only the focused conversation composer is used — never search, comment,
+caption, note, group-name, or share/forward dialog fields.
+
+How replacement works: the composer is Instagram's Lexical editor (or a
+textarea on older layouts). The extension selects the draft and uses the
+browser's own `insertText` editing command for a single line, or a plain-text
+paste for several lines, so Instagram's editor updates its own state. It then
+reads the composer back; if the text did not stick exactly, the original draft is
+put back and only **Copy** is offered. A draft that contains anything besides
+plain text, emoji and line breaks (mentions, links, stickers, unknown
+structure) is never overwritten — use **Copy**.
+
+Privacy: only the active draft is read, and only after you press Translate or
+the shortcut. Chat history and received messages are never read, nothing is
+stored, and Instagram's network requests and private APIs are not touched.
+
+Known limitations:
+
+- Tested against a real Lexical editor and simulated Instagram markup, not yet
+  in a signed-in Instagram session. Instagram changes its DOM often; if the
+  button does not appear or Replace stays unavailable, use Copy and report the
+  DOM structure (see the checklist below).
+- The mini chat window that opens over other Instagram pages is not supported;
+  open the conversation at `/direct/`.
+- The panel follows the system light/dark preference, which can differ from
+  Instagram's own theme setting.
 
 ## Translators
 
@@ -69,6 +114,14 @@ content script ── message ──▶   background.ts            ─HTTPS─�
 - `entrypoints/background.ts` – receives translate requests from the content
   script, reads settings, and calls the selected translator. The content script
   never sees the access token.
+- `src/content/floating-translator.tsx` – the shared floating controls: Shadow
+  DOM host, positioning, translate/Replace/Undo flow, navigation and
+  draft-change protection. Each site's content script
+  (`entrypoints/telegram.content.tsx`, `entrypoints/instagram.content.tsx`)
+  passes in its editor adapter and composer finders.
+- `src/adapters/telegram.ts`, `src/adapters/instagram.ts` – site-specific
+  `MessageEditorAdapter`s (detection, plain-text reading, safe replacement), with
+  shared helpers in `src/adapters/editor-utils.ts`.
 - `entrypoints/popup` – settings: translator, server URL, access token.
 - `apps/api` – the Cloudflare Worker. `providers/google.ts` implements
   `GoogleCloudTranslationProvider`; other providers can implement the same
@@ -239,6 +292,43 @@ curl -s http://localhost:8787/v1/translate \
 In Telegram Web: type a draft, pick a target language, press **Translate**,
 check the detected language and preview, press **Replace**, then **Undo**. Send
 the message yourself.
+
+### Manual checklist: Instagram Direct
+
+1. `npm run build`, reload the extension at `chrome://extensions`, then reload
+   the Instagram tab.
+2. Open `https://www.instagram.com/direct/inbox/` and pick a conversation.
+3. Click the message box and type `Salom, yaxshimisan?`. The controls appear
+   above the message bar without covering Send, emoji, or attachment buttons.
+4. Choose a source (Oʻzbekcha for MyMemory) and target, press **Translate**:
+   a preview appears and the message is **not** sent.
+5. Press **Replace**: the message box shows the translation. Type one letter to
+   check Instagram still accepts input, delete it, then press **Undo**.
+6. Repeat with `Ctrl+Shift+Y`, a two-line draft (Shift+Enter), and emoji.
+7. Edit the draft after pressing Translate, then press Replace: it is refused.
+8. Press Translate, then switch to another conversation before it finishes: no
+   stale preview appears in the new conversation.
+9. Click the Instagram search box, a post's comment field, and the
+   share/forward dialog: no Translate controls appear.
+10. Open the home feed or a profile: no controls appear.
+
+If the controls do not appear or Replace is unavailable for plain text, run this
+in DevTools on the conversation (it prints structure and text lengths only):
+
+```js
+(function () {
+  var ed = document.activeElement;
+  var out = [];
+  (function walk(n, d) {
+    var pad = new Array(d + 1).join('  ');
+    if (n.nodeType === 3) { out.push(pad + '#text len=' + n.data.length); return; }
+    if (n.nodeType !== 1) return;
+    out.push(pad + '<' + n.tagName.toLowerCase() + '> attrs=[' + n.getAttributeNames().join(',') + ']');
+    for (var i = 0; i < n.childNodes.length; i++) walk(n.childNodes[i], d + 1);
+  })(ed, 0);
+  console.log(out.join('\n'));
+})();
+```
 
 Run `npm run cf-typegen` in `apps/api` after changing `wrangler.jsonc` bindings
 or vars.

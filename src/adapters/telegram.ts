@@ -1,3 +1,4 @@
+import { dispatchPlainTextPaste, isTextArea, isVisible, normalizeText, waitForEditor } from './editor-utils';
 import type { MessageEditorAdapter } from './types';
 
 const KNOWN_COMPOSER_SELECTOR = [
@@ -30,11 +31,6 @@ const TELEGRAM_PARAGRAPH_ATTRIBUTES = new Set(['class', 'dir', 'data-placeholder
 const TELEGRAM_PARAGRAPH_CLASS = /^(_(Padding|Paragraph)_[\w-]+|chat-input-[\w-]*placeholder[\w-]*)$/;
 const TELEGRAM_TRAILING_PLACEHOLDER_CLASS = 'chat-input-trailing-placeholder';
 
-function isVisible(element: HTMLElement): boolean {
-  const style = getComputedStyle(element);
-  return style.display !== 'none' && style.visibility !== 'hidden' && element.getClientRects().length > 0;
-}
-
 function hasSearchSemantics(element: HTMLElement): boolean {
   const labels = [
     element.getAttribute('aria-label'),
@@ -60,16 +56,8 @@ function hasComposerSemantics(element: HTMLElement): boolean {
     !element.closest('[role="search"], form[role="search"]');
 }
 
-function isTextArea(element: HTMLElement): element is HTMLTextAreaElement {
-  return element instanceof HTMLTextAreaElement;
-}
-
 function isProseMirror(editor: HTMLElement): boolean {
   return editor.classList.contains('ProseMirror');
-}
-
-function normalizeText(text: string): string {
-  return text.replace(/\r\n?/g, '\n').replace(/\u00a0/g, ' ');
 }
 
 function isEmojiImage(node: Node): node is HTMLImageElement {
@@ -153,10 +141,6 @@ function canInsertText(editor: HTMLElement, text: string): boolean {
   return !(isProseMirror(editor) && normalizeText(text).includes('\n\n'));
 }
 
-function waitForEditor(): Promise<void> {
-  return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-}
-
 function selectEditorContents(editor: HTMLElement): void {
   const selection = editor.ownerDocument.getSelection();
   if (!selection) return;
@@ -195,14 +179,7 @@ async function insertReplacement(editor: HTMLElement, text: string): Promise<voi
     // paste goes through ProseMirror's transaction path instead. Wait first so
     // ProseMirror picks up the new selection from selectionchange.
     await waitForEditor();
-    const clipboardData = new DataTransfer();
-    clipboardData.setData('text/plain', text);
-    editor.dispatchEvent(new ClipboardEvent('paste', {
-      clipboardData,
-      bubbles: true,
-      cancelable: true,
-      composed: true,
-    }));
+    dispatchPlainTextPaste(editor, text);
     return;
   }
 
