@@ -6,9 +6,20 @@ import type { MessageEditorAdapter } from './types';
 // relies on roles, ARIA labels and the editor type instead of classes.
 const EDITOR_CANDIDATE_SELECTOR = 'textarea, [contenteditable="true"], [contenteditable="plaintext-only"]';
 const MESSAGE_LABEL = /\bmessages?\b|сообщени|xabar/i;
-// Fields that can appear on Direct pages but are not the conversation composer.
+// Fields that can appear next to DMs but are not a conversation composer.
 const UNRELATED_LABEL = /\b(search|comment|caption|bio|note|notes|name|title|reply to story)\b|поиск|коммент|qidir|izoh/i;
-const UNRELATED_CONTAINER = '[role="dialog"], [role="search"], form[role="search"], [aria-modal="true"]';
+const SEARCH_CONTAINER = '[role="search"], form[role="search"]';
+// Floating DM panels are overlays: a dialog, or a fixed-position container.
+const OVERLAY_CONTAINER = '[role="dialog"], [aria-modal="true"]';
+const MAX_OVERLAY_DEPTH = 15;
+// A conversation shows a message thread next to the composer.
+const THREAD_MARKER = '[role="grid"], [role="log"], [role="row"], [data-scope="messages_table"], ' +
+  '[aria-label*="message" i], [aria-label*="conversation" i], [aria-label*="chat" i]';
+const CONVERSATION_LABEL = /\b(conversation|chat|messages)\b/i;
+// Share, forward and new-message dialogs pick recipients; they are not a conversation.
+const RECIPIENT_PICKER = 'input[type="checkbox"], [role="checkbox"], input[type="search"], ' +
+  'input[aria-label*="search" i], input[placeholder*="search" i], [role="searchbox"]';
+const PICKER_LABEL = /\b(share|forward|send to|new message)\b/i;
 const COMPOSER_CONTROL = 'button, [role="button"]';
 const MAX_ANCHOR_DEPTH = 6;
 
@@ -24,6 +35,32 @@ function labelsOf(element: HTMLElement): string {
     element.getAttribute('placeholder'),
     element.getAttribute('data-placeholder'),
   ].filter(Boolean).join(' ');
+}
+
+function findFixedAncestor(editor: HTMLElement): HTMLElement | null {
+  let candidate = editor.parentElement;
+  for (let depth = 0; candidate && candidate !== document.body && depth < MAX_OVERLAY_DEPTH; depth += 1) {
+    if (getComputedStyle(candidate).position === 'fixed') return candidate;
+    candidate = candidate.parentElement;
+  }
+  return null;
+}
+
+/** The floating DM panel (dialog or fixed overlay) containing the editor, if any. */
+function findOverlay(editor: HTMLElement): HTMLElement | null {
+  return editor.closest<HTMLElement>(OVERLAY_CONTAINER) ?? findFixedAncestor(editor);
+}
+
+/**
+ * Whether an overlay is a chat with a message thread (a floating DM panel)
+ * rather than a recipient picker such as Share or Forward. Only element roles
+ * and label keywords are inspected, never message text.
+ */
+function isConversationOverlay(overlay: HTMLElement, editor: HTMLElement): boolean {
+  if (PICKER_LABEL.test(overlay.getAttribute('aria-label') ?? '') || overlay.querySelector(RECIPIENT_PICKER)) return false;
+  if (CONVERSATION_LABEL.test(overlay.getAttribute('aria-label') ?? '')) return true;
+  return Array.from(overlay.querySelectorAll(THREAD_MARKER))
+    .some((marker) => marker !== editor && !marker.contains(editor) && !editor.contains(marker));
 }
 
 function hasOnlyAttributes(element: Element, allowed: ReadonlySet<string>): boolean {
@@ -151,14 +188,24 @@ async function replaceAndVerify(editor: HTMLElement, text: string): Promise<bool
 
 export const instagramEditorAdapter: MessageEditorAdapter = {
   isComposer(element): element is HTMLElement {
-    if (!(element instanceof HTMLElement) || !isInstagramDirectPath(location.pathname)) return false;
-    if (!element.matches(EDITOR_CANDIDATE_SELECTOR) || element.closest(UNRELATED_CONTAINER)) return false;
+    if (!(element instanceof HTMLElement)) return false;
+    if (!element.matches(EDITOR_CANDIDATE_SELECTOR) || element.closest(SEARCH_CONTAINER)) return false;
 
     const labels = labelsOf(element);
     if (UNRELATED_LABEL.test(labels)) return false;
     const isLexicalTextbox = element.getAttribute('data-lexical-editor') === 'true' &&
       element.getAttribute('role') === 'textbox';
-    return (MESSAGE_LABEL.test(labels) || isLexicalTextbox) && isVisible(element);
+    if (!(MESSAGE_LABEL.test(labels) || isLexicalTextbox) || !isVisible(element)) return false;
+
+    // Floating DM panels can open over any page, so the DOM context decides,
+    // not the URL: a dialog must be a conversation, not a recipient picker.
+    const dialog = element.closest<HTMLElement>(OVERLAY_CONTAINER);
+    if (dialog) return isConversationOverlay(dialog, element);
+    // The main Direct page keeps its existing behaviour.
+    if (isInstagramDirectPath(location.pathname)) return true;
+    // Elsewhere, only a fixed chat panel with a message thread qualifies.
+    const panel = findFixedAncestor(element);
+    return panel !== null && isConversationOverlay(panel, element);
   },
 
   readDraft,
@@ -177,8 +224,7 @@ export function findInstagramComposer(target: EventTarget | null): HTMLElement |
 }
 
 export function findFocusedInstagramComposer(): HTMLElement | null {
-  // Cheap route check first: this runs on every DOM mutation.
-  if (!isInstagramDirectPath(location.pathname)) return null;
+  // Runs on DOM mutations; `closest` rejects non-editable focus targets cheaply.
   return findInstagramComposer(document.activeElement);
 }
 
@@ -187,9 +233,11 @@ export function findFocusedInstagramComposer(): HTMLElement | null {
  * or Send controls. The floating controls sit above it, so they never cover them.
  */
 export function findInstagramComposerPositioningAnchor(editor: HTMLElement): HTMLElement {
+  // Stay inside a floating panel so the controls sit by its composer.
+  const overlay = findOverlay(editor);
   let candidate = editor.parentElement;
   for (let depth = 0; candidate && depth < MAX_ANCHOR_DEPTH; depth += 1) {
-    if (candidate === document.body || candidate.closest(UNRELATED_CONTAINER)) break;
+    if (candidate === document.body || candidate === overlay) break;
     const hasControls = Array.from(candidate.querySelectorAll(COMPOSER_CONTROL)).some((control) => !editor.contains(control));
     if (hasControls) return isVisible(candidate) ? candidate : editor;
     candidate = candidate.parentElement;

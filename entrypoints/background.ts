@@ -7,7 +7,7 @@ import {
   type TranslationRequest,
   type TranslationResult,
 } from '../src/services/translation';
-import { TRANSLATE_DRAFT_MESSAGE, isTranslateTextMessage, type TranslateTextResponse } from '../src/utils/messaging';
+import { isTranslateTextMessage, type TranslateTextResponse } from '../src/utils/messaging';
 import {
   apiAccessTokenSetting,
   apiBaseUrlSetting,
@@ -15,7 +15,6 @@ import {
   myMemoryEmailSetting,
   translationProviderSetting,
 } from '../src/utils/settings';
-import { isTranslatableTabUrl } from '../src/utils/sites';
 
 async function translate(request: TranslationRequest): Promise<TranslationResult> {
   if (!request.text.trim() || !isSupportedLanguage(request.target) ||
@@ -54,20 +53,6 @@ async function handleTranslateText(request: TranslationRequest): Promise<Transla
 }
 
 export default defineBackground(() => {
-  browser.commands.onCommand.addListener((command) => {
-    if (command !== 'translate-draft') return;
-
-    void browser.tabs.query({ active: true, lastFocusedWindow: true }).then((tabs) => {
-      const activeTab = tabs[0];
-      // Each supported site's content script handles the same message for its own composer.
-      if (!activeTab?.id || !isTranslatableTabUrl(activeTab.url)) return;
-
-      return browser.tabs.sendMessage(activeTab.id, { type: TRANSLATE_DRAFT_MESSAGE });
-    }).catch(() => {
-      console.warn('Could not deliver the Translate shortcut to the active tab.');
-    });
-  });
-
   browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (sender.id !== browser.runtime.id || !isTranslateTextMessage(message)) return;
 

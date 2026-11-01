@@ -211,3 +211,109 @@ describe('Instagram draft replacement', () => {
     expect(textarea.value).toBe('Hello, how are you? 👋');
   });
 });
+
+/** A floating DM panel over another page: dialog or fixed overlay, thread, composer bar. */
+function mountFloatingPanel({
+  id = 'a',
+  container = 'dialog',
+  thread = '<div role="grid" aria-label="Messages in conversation"><div role="row"></div></div>',
+  picker = '',
+  editor = `<div aria-label="Message" contenteditable="true" role="textbox" data-lexical-editor="true">${paragraph(text('Salom'))}</div>`,
+}: { id?: string; container?: 'dialog' | 'fixed'; thread?: string; picker?: string; editor?: string } = {}) {
+  const panel = document.createElement('div');
+  panel.dataset.panel = id;
+  if (container === 'dialog') panel.setAttribute('role', 'dialog');
+  else panel.style.position = 'fixed';
+  panel.innerHTML = `
+    <header><div role="button" aria-label="Minimize"></div><div role="button" aria-label="Close"></div></header>
+    ${picker}${thread}
+    <div class="composer-bar">
+      <div role="button" aria-label="Emoji"></div>
+      <div class="field">${editor}</div>
+      <div role="button" aria-label="Voice clip"></div>
+    </div>`;
+  document.body.append(panel);
+  return { panel, editor: panel.querySelector<HTMLElement>('.composer-bar .field > *')! };
+}
+
+describe('Instagram floating DM panels', () => {
+  beforeEach(() => { document.body.innerHTML = '<main role="main"></main>'; });
+
+  it.each(['/reels/C1a2b3c4d5/', '/someone/', '/p/C1a2b3c4d5/', '/', '/explore/'])('detects the composer of a dialog panel over %s', (path) => {
+    history.pushState({}, '', path);
+    const { editor } = mountFloatingPanel();
+    expect(adapter.isComposer(editor)).toBe(true);
+    expect(findInstagramComposer(editor.querySelector('span'))).toBe(editor);
+  });
+
+  it('detects a fixed-position panel that is not marked as a dialog', () => {
+    history.pushState({}, '', '/reels/C1a2b3c4d5/');
+    const { editor } = mountFloatingPanel({ container: 'fixed', thread: '<div role="log"></div>' });
+    expect(adapter.isComposer(editor)).toBe(true);
+  });
+
+  it('detects a panel identified only by its conversation label', () => {
+    history.pushState({}, '', '/someone/');
+    const { panel, editor } = mountFloatingPanel({ thread: '' });
+    panel.setAttribute('aria-label', 'Chat');
+    expect(adapter.isComposer(editor)).toBe(true);
+  });
+
+  it('detects a textarea composer in a panel', () => {
+    history.pushState({}, '', '/someone/');
+    const { editor } = mountFloatingPanel({ editor: '<textarea placeholder="Message..."></textarea>' });
+    expect(adapter.isComposer(editor)).toBe(true);
+  });
+
+  it('anchors the controls to the panel composer bar, not the panel or the editor', () => {
+    history.pushState({}, '', '/reels/C1a2b3c4d5/');
+    const { editor } = mountFloatingPanel();
+    expect(findInstagramComposerPositioningAnchor(editor).className).toBe('composer-bar');
+  });
+
+  it('handles two panels at once, each with its own composer and anchor', () => {
+    history.pushState({}, '', '/someone/');
+    const first = mountFloatingPanel({ id: 'a' });
+    const second = mountFloatingPanel({ id: 'b' });
+    expect(adapter.isComposer(first.editor)).toBe(true);
+    expect(adapter.isComposer(second.editor)).toBe(true);
+    expect(findInstagramComposerPositioningAnchor(second.editor).closest('[data-panel]')).toBe(second.panel);
+
+    second.editor.focus();
+    expect(findFocusedInstagramComposer()).toBe(second.editor);
+  });
+
+  it.each([
+    ['a share dialog with recipient checkboxes', { picker: '<input type="checkbox" aria-label="Select">', thread: '', editor: '<textarea placeholder="Write a message..."></textarea>' }],
+    ['a share dialog even when it lists rows', { picker: '<input aria-label="Search" placeholder="Search...">', editor: '<textarea placeholder="Write a message..."></textarea>' }],
+    ['a new-message dialog with a search box', { picker: '<div role="searchbox" contenteditable="true"></div>' }],
+    ['an overlay without a message thread', { thread: '<div class="content"></div>' }],
+    ['a fixed overlay without a message thread', { container: 'fixed' as const, thread: '' }],
+    ['a comment drawer', { container: 'fixed' as const, editor: '<textarea aria-label="Add a comment…" placeholder="Add a comment…"></textarea>' }],
+    ['a search field in a fixed bar', { container: 'fixed' as const, editor: '<div contenteditable="true" role="textbox" aria-label="Search"></div>' }],
+    ['a caption box in a dialog', { editor: '<div contenteditable="true" role="textbox" aria-label="Write a caption..."></div>' }],
+  ])('rejects %s', (_label, options) => {
+    history.pushState({}, '', '/reels/C1a2b3c4d5/');
+    const { editor } = mountFloatingPanel(options);
+    expect(adapter.isComposer(editor)).toBe(false);
+  });
+
+  it('rejects a message-labelled field outside any panel on non-Direct pages', () => {
+    history.pushState({}, '', '/someone/');
+    document.body.innerHTML = '<main><div class="bar"><div role="button"></div><textarea placeholder="Message..."></textarea></div></main>';
+    expect(adapter.isComposer(document.querySelector('textarea'))).toBe(false);
+  });
+
+  it('reads and safely refuses rich drafts in a panel like the main page', () => {
+    history.pushState({}, '', '/someone/');
+    const plain = mountFloatingPanel({ id: 'plain' }).editor;
+    expect(adapter.readDraft(plain)).toBe('Salom');
+    expect(adapter.canReplaceDraft(plain)).toBe(true);
+
+    const rich = mountFloatingPanel({
+      id: 'rich',
+      editor: `<div aria-label="Message" contenteditable="true" role="textbox" data-lexical-editor="true">${paragraph(`${text('qara ')}<a href="https://example.com">bu</a>`)}</div>`,
+    }).editor;
+    expect(adapter.canReplaceDraft(rich)).toBe(false);
+  });
+});

@@ -13,7 +13,7 @@ import {
 import { TRANSLATION_PROVIDERS, isTranslationProviderId } from '../services/providers';
 import { TranslationError, TRANSLATION_ERROR_MESSAGES, type TranslationResult } from '../services/translation';
 import { TranslatePanel, type PanelState } from '../components/TranslatePanel';
-import { TRANSLATE_DRAFT_MESSAGE, requestTranslation } from '../utils/messaging';
+import { requestTranslation } from '../utils/messaging';
 import {
   sourceLanguageSetting,
   targetLanguageSetting,
@@ -128,7 +128,10 @@ export function startFloatingTranslator(ctx: ContentScriptContext, site: Floatin
 
   const positionUi = () => {
     if (!shadowHost || !uiContainer) return;
-    if (!activeEditor?.isConnected || !activePositioningAnchor?.isConnected) {
+    // A connected but unrendered anchor (e.g. a minimized chat panel) has no
+    // boxes; hide instead of clamping the controls into a viewport corner.
+    if (!activeEditor?.isConnected || !activePositioningAnchor?.isConnected ||
+      activePositioningAnchor.getClientRects().length === 0) {
       shadowHost.style.setProperty('display', 'none', 'important');
       return;
     }
@@ -225,7 +228,7 @@ export function startFloatingTranslator(ctx: ContentScriptContext, site: Floatin
   async function translateDraft() {
     const editor = activeEditor;
     if (!editor?.isConnected) return;
-    // Ignore repeated clicks or shortcut presses while a request is in flight.
+    // Ignore repeated clicks while a request is in flight.
     if (panelState.status === 'loading' || panelState.status === 'replacing') return;
 
     const snapshot: DraftSnapshot = draftManager.capture(editor);
@@ -421,12 +424,6 @@ export function startFloatingTranslator(ctx: ContentScriptContext, site: Floatin
       if (editor) setActiveEditor(editor);
     });
   };
-  const onRuntimeMessage = (message: unknown) => {
-    if (typeof message === 'object' && message !== null &&
-      'type' in message && message.type === TRANSLATE_DRAFT_MESSAGE) {
-      void translateDraft();
-    }
-  };
 
   const observer = new MutationObserver(() => {
     if (activeEditor && !activeEditor.isConnected) setActiveEditor(null);
@@ -445,7 +442,6 @@ export function startFloatingTranslator(ctx: ContentScriptContext, site: Floatin
   window.visualViewport?.addEventListener('scroll', onScrollOrResize);
   window.visualViewport?.addEventListener('resize', onScrollOrResize);
   ctx.addEventListener(window, 'wxt:locationchange', onLocationChange);
-  browser.runtime.onMessage.addListener(onRuntimeMessage);
   observer.observe(document.documentElement, { childList: true, subtree: true });
   const applyStoredTargetLanguage = (language: LanguageCode | null) => {
     const next = isSupportedLanguage(language) ? language : DEFAULT_TARGET_LANGUAGE;
@@ -512,7 +508,6 @@ export function startFloatingTranslator(ctx: ContentScriptContext, site: Floatin
     window.removeEventListener('resize', onScrollOrResize);
     window.visualViewport?.removeEventListener('scroll', onScrollOrResize);
     window.visualViewport?.removeEventListener('resize', onScrollOrResize);
-    browser.runtime.onMessage.removeListener(onRuntimeMessage);
     unwatchSettings.forEach((unwatch) => unwatch());
     lastTranslation = null;
     observer.disconnect();

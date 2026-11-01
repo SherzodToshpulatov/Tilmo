@@ -6,12 +6,7 @@ import {
   type TranslationResult,
 } from '../services/translation';
 
-export const TRANSLATE_DRAFT_MESSAGE = 'translate-draft';
 export const TRANSLATE_TEXT_MESSAGE = 'translate-text';
-
-export interface TranslateDraftMessage {
-  type: typeof TRANSLATE_DRAFT_MESSAGE;
-}
 
 /** Content script → background: translate text the user explicitly asked for. */
 export interface TranslateTextMessage {

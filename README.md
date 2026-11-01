@@ -9,28 +9,42 @@ inspired by Gboard Translate.
 | Site | URLs | Composer |
 | --- | --- | --- |
 | Telegram Web (K and A) | `https://web.telegram.org/*` | Tiptap/ProseMirror or plain editor |
-| Instagram Direct | `https://www.instagram.com/direct/*` (inbox and conversations) | Lexical editor or textarea |
+| Instagram Direct | `https://www.instagram.com/direct/*`, plus floating DM panels on any `www.instagram.com` page (Reels, posts, profiles) | Lexical editor or textarea |
 
 ## Telegram Web
 
 The Telegram Web content script detects the message composer and shows a
 floating **Translate** button with source and target language menus (Oʻzbekcha,
 English, Русский). Translators that can detect languages also offer **Auto** as
-the source. Press **Translate** or `Ctrl+Shift+Y` to preview a translation, then
-**Replace** the draft, **Undo** it, or **Copy** the text.
+the source. Press **Translate** to preview a translation, then **Replace** the
+draft, **Undo** it, or **Copy** the text.
 
 ## Instagram Direct
 
 Open a conversation at `https://www.instagram.com/direct/…`, type a message,
 and the same **Translate** controls appear above the message bar (they never
-cover the emoji, attachment or Send buttons). Press **Translate** or
-`Ctrl+Shift+Y` (`Command+Shift+Y` on macOS), check the preview, press
-**Replace**, and send the message yourself. **Undo** restores your draft.
+cover the emoji, attachment or Send buttons). Press **Translate**, check the
+preview, press **Replace**, and send the message yourself. **Undo** restores
+your draft.
 
-The content script is injected on all `www.instagram.com` pages because
-Instagram navigates without reloading, but it does nothing outside `/direct/`
-routes. Only the focused conversation composer is used — never search, comment,
-caption, note, group-name, or share/forward dialog fields.
+The same controls work in the floating DM panels that open over Reels, posts,
+profiles and other pages. They follow whichever panel's message box you focus,
+hide when a panel is closed or minimized, and sit above that panel's message bar
+(never over its emoji, microphone, attachment or Send buttons).
+
+The content script runs on all `www.instagram.com` pages because Instagram
+navigates without reloading. It activates only for a genuine conversation
+composer, decided by the page structure rather than the URL:
+
+- The field must be a message box: a textarea or Lexical textbox labelled as a
+  message, never a search, comment, caption, note, name or story-reply field.
+- On the main `/direct/` page, that is enough.
+- In a dialog or fixed-position overlay (a floating panel), the overlay must
+  also contain a message thread (an element with role `grid`, `log` or `row`,
+  or a label mentioning messages, conversation or chat) and must not be a
+  recipient picker (search box or checkboxes, as in Share, Forward and New
+  message).
+- Anywhere else, it stays inactive.
 
 How replacement works: the composer is Instagram's Lexical editor (or a
 textarea on older layouts). The extension selects the draft and uses the
@@ -41,8 +55,8 @@ put back and only **Copy** is offered. A draft that contains anything besides
 plain text, emoji and line breaks (mentions, links, stickers, unknown
 structure) is never overwritten — use **Copy**.
 
-Privacy: only the active draft is read, and only after you press Translate or
-the shortcut. Chat history and received messages are never read, nothing is
+Privacy: only the active draft is read, and only after you press Translate.
+Chat history and received messages are never read, nothing is
 stored, and Instagram's network requests and private APIs are not touched.
 
 Known limitations:
@@ -51,8 +65,11 @@ Known limitations:
   in a signed-in Instagram session. Instagram changes its DOM often; if the
   button does not appear or Replace stays unavailable, use Copy and report the
   DOM structure (see the checklist below).
-- The mini chat window that opens over other Instagram pages is not supported;
-  open the conversation at `/direct/`.
+- Floating DM panels are recognised by the structure described above, which is
+  based on how Instagram typically marks up chats, not on a live inspection. If a
+  panel's composer gets no Translate button, run the diagnostic below.
+- A panel minimized by an animation that keeps its boxes on screen is only
+  detected once focus leaves it (clicking elsewhere hides the controls).
 - The panel follows the system light/dark preference, which can differ from
   Instagram's own theme setting.
 
@@ -85,15 +102,12 @@ any origin). Notes:
   text as a translation.
 - Results can come from MyMemory's translation memory, so quality varies.
 
-- Text leaves the browser only when you press Translate or the shortcut.
+- Text leaves the browser only when you press Translate.
 - Replace is offered only for plain-text drafts. Drafts with links, mentions or
   formatting can be copied but are never overwritten.
 - If the draft changes or you switch chats while a translation is pending,
   Replace and Undo are refused.
 - The extension never sends a Telegram message.
-
-`Ctrl+Shift+Y` becomes `Command+Shift+Y` on macOS. If it conflicts with
-another extension, change it at `chrome://extensions/shortcuts`.
 
 ## Architecture
 
@@ -304,13 +318,13 @@ the message yourself.
    a preview appears and the message is **not** sent.
 5. Press **Replace**: the message box shows the translation. Type one letter to
    check Instagram still accepts input, delete it, then press **Undo**.
-6. Repeat with `Ctrl+Shift+Y`, a two-line draft (Shift+Enter), and emoji.
+6. Repeat with a two-line draft (Shift+Enter) and with emoji.
 7. Edit the draft after pressing Translate, then press Replace: it is refused.
 8. Press Translate, then switch to another conversation before it finishes: no
    stale preview appears in the new conversation.
 9. Click the Instagram search box, a post's comment field, and the
    share/forward dialog: no Translate controls appear.
-10. Open the home feed or a profile: no controls appear.
+10. Open the home feed or a profile without a chat panel: no controls appear.
 
 If the controls do not appear or Replace is unavailable for plain text, run this
 in DevTools on the conversation (it prints structure and text lengths only):
@@ -327,6 +341,46 @@ in DevTools on the conversation (it prints structure and text lengths only):
     for (var i = 0; i < n.childNodes.length; i++) walk(n.childNodes[i], d + 1);
   })(ed, 0);
   console.log(out.join('\n'));
+})();
+```
+
+### Manual checklist: floating DM panels
+
+1. Open a Reel, then open a chat from the Messages button so a floating panel
+   appears. Click its message box and type `nima gap`: the controls appear
+   above that panel's message bar, not in a page corner.
+2. Translate, Replace, and Undo as above. Nothing is sent until you press Send.
+3. Repeat over a profile page and a post page.
+4. With two panels open, click into one, then the other: the controls follow
+   the focused message box and Translate uses that panel's draft.
+5. Minimize and close a panel: the controls disappear. Reopen it: they return
+   when you click its message box.
+6. Press Translate with an empty message box: an error asks you to type a
+   draft; no request is made.
+7. Click the comment box of the Reel behind the panel and the search box: no
+   controls appear.
+
+If a floating panel's composer gets no controls, click its message box and run
+this in DevTools. It prints only element names, roles, positioning and which
+detection rules match — no message text, names or labels:
+
+```js
+(function () {
+  var ed = document.activeElement, rows = [];
+  var markers = '[role="grid"],[role="log"],[role="row"],[data-scope="messages_table"],[aria-label*="message" i],[aria-label*="conversation" i],[aria-label*="chat" i]';
+  var pickers = 'input[type="checkbox"],[role="checkbox"],input[type="search"],input[aria-label*="search" i],input[placeholder*="search" i],[role="searchbox"]';
+  rows.push('editor: <' + ed.tagName.toLowerCase() + '> role=' + ed.getAttribute('role') +
+    ' lexical=' + ed.hasAttribute('data-lexical-editor') +
+    ' messageLabel=' + /\bmessages?\b|сообщени|xabar/i.test([ed.getAttribute('aria-label'), ed.getAttribute('placeholder'), ed.getAttribute('aria-placeholder')].join(' ')));
+  for (var n = ed.parentElement, d = 1; n && n !== document.body && d <= 15; n = n.parentElement, d++) {
+    var fixed = getComputedStyle(n).position === 'fixed', dialog = n.matches('[role="dialog"],[aria-modal="true"]');
+    if (!fixed && !dialog) continue;
+    var threadCount = Array.from(n.querySelectorAll(markers)).filter(function (m) { return m !== ed && !m.contains(ed) && !ed.contains(m); }).length;
+    rows.push('ancestor ' + d + ': <' + n.tagName.toLowerCase() + '> fixed=' + fixed + ' dialog=' + dialog +
+      ' threadMarkers=' + threadCount + ' pickers=' + n.querySelectorAll(pickers).length +
+      ' conversationLabel=' + /\b(conversation|chat|messages)\b/i.test(n.getAttribute('aria-label') || ''));
+  }
+  console.log(rows.join('\n'));
 })();
 ```
 

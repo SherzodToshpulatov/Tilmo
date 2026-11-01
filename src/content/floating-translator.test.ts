@@ -9,7 +9,7 @@ import {
   instagramEditorAdapter,
 } from '../adapters/instagram';
 import type { TranslationRequest } from '../services/translation';
-import { TRANSLATE_DRAFT_MESSAGE, isTranslateTextMessage, type TranslateTextResponse } from '../utils/messaging';
+import { isTranslateTextMessage, type TranslateTextResponse } from '../utils/messaging';
 import { FLOATING_HOST_ID, startFloatingTranslator } from './floating-translator';
 
 const instagram = {
@@ -141,17 +141,6 @@ describe('floating translator lifecycle', () => {
     await vi.waitFor(() => expect(textarea.value).toBe('Salom, yaxshimisan?'));
   });
 
-  it('runs on the keyboard shortcut message', async () => {
-    const textarea = mountComposer('nima gap');
-    start();
-    focus(textarea);
-    await vi.waitFor(() => expect(button('.translate')).not.toBeNull());
-
-    await fakeBrowser.runtime.onMessage.trigger({ type: TRANSLATE_DRAFT_MESSAGE }, {}, () => {});
-    await vi.waitFor(() => expect(shadow().querySelector('.result')).not.toBeNull());
-    expect(requests.map((request) => request.text)).toEqual(['nima gap']);
-  });
-
   it('does not offer Replace when the draft changes while the translation is pending', async () => {
     const textarea = mountComposer('Salom');
     let finish!: () => void;
@@ -203,7 +192,128 @@ describe('floating translator lifecycle', () => {
     ctx.abort();
     expect(hosts()).toHaveLength(0);
 
-    await fakeBrowser.runtime.onMessage.trigger({ type: TRANSLATE_DRAFT_MESSAGE }, {}, () => {});
+    // Focus and DOM listeners are gone: the controls do not come back.
+    focus(textarea);
+    textarea.after(document.createElement('span'));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(hosts()).toHaveLength(0);
     expect(requests).toHaveLength(0);
+  });
+});
+
+describe('floating DM panels', () => {
+  function mountPanel(id: string, value: string) {
+    const panel = document.createElement('div');
+    panel.setAttribute('role', 'dialog');
+    panel.dataset.panel = id;
+    panel.innerHTML = `
+      <header><div role="button" aria-label="Minimize"></div><div role="button" aria-label="Close"></div></header>
+      <div role="grid" aria-label="Messages in conversation"></div>
+      <div class="composer-bar">
+        <div role="button" aria-label="Emoji"></div>
+        <textarea placeholder="Message..."></textarea>
+        <div role="button" aria-label="Send"></div>
+      </div>`;
+    document.body.append(panel);
+    const textarea = panel.querySelector('textarea')!;
+    textarea.value = value;
+    return { panel, textarea };
+  }
+
+  beforeEach(() => {
+    history.pushState({}, '', '/reels/C1a2b3c4d5/');
+    document.body.innerHTML = `
+      <main role="main">
+        <textarea aria-label="Add a comment…" placeholder="Add a comment…"></textarea>
+        <input aria-label="Search" placeholder="Search">
+      </main>`;
+  });
+
+  it('translates, replaces and undoes in a panel over Reels without sending', async () => {
+    const { textarea } = mountPanel('a', 'Salom, yaxshimisan?');
+    const sends: Event[] = [];
+    textarea.addEventListener('keydown', (event) => sends.push(event));
+    start();
+    focus(textarea);
+    await vi.waitFor(() => expect(button('.translate')).not.toBeNull());
+    expect(hosts()[0]!.style.getPropertyValue('display')).toBe('block');
+
+    button('.translate')!.click();
+    await vi.waitFor(() => expect(shadow().querySelector('.result')?.textContent).toBe('Hello, how are you?'));
+    expect(requests).toEqual([{ text: 'Salom, yaxshimisan?', source: 'auto', target: 'en' }]);
+
+    buttonByText('Replace')!.click();
+    await vi.waitFor(() => expect(buttonByText('Undo')).not.toBeNull());
+    expect(textarea.value).toBe('Hello, how are you?');
+    buttonByText('Undo')!.click();
+    await vi.waitFor(() => expect(textarea.value).toBe('Salom, yaxshimisan?'));
+    expect(sends).toHaveLength(0);
+  });
+
+  it('works over a profile page', async () => {
+    history.pushState({}, '', '/someone/');
+    const { textarea } = mountPanel('a', 'nima gap');
+    start();
+    focus(textarea);
+    await vi.waitFor(() => expect(button('.translate')).not.toBeNull());
+  });
+
+  it('reports an empty draft without sending a request', async () => {
+    const { textarea } = mountPanel('a', '   ');
+    start();
+    focus(textarea);
+    await vi.waitFor(() => expect(button('.translate')).not.toBeNull());
+
+    button('.translate')!.click();
+    await vi.waitFor(() => expect(shadow().querySelector('.error')?.textContent).toMatch(/type a draft/i));
+    expect(requests).toHaveLength(0);
+  });
+
+  it('follows focus between two open panels', async () => {
+    const first = mountPanel('a', 'birinchi');
+    const second = mountPanel('b', 'ikkinchi');
+    start();
+    focus(first.textarea);
+    await vi.waitFor(() => expect(button('.translate')).not.toBeNull());
+
+    focus(second.textarea);
+    button('.translate')!.click();
+    await vi.waitFor(() => expect(requests).toHaveLength(1));
+    expect(requests[0]!.text).toBe('ikkinchi');
+    expect(hosts()).toHaveLength(1);
+  });
+
+  it('hides the controls when the panel is closed', async () => {
+    const { panel, textarea } = mountPanel('a', 'Salom');
+    start();
+    focus(textarea);
+    await vi.waitFor(() => expect(button('.translate')).not.toBeNull());
+
+    panel.remove();
+    await vi.waitFor(() => expect(button('.translate')).toBeNull());
+    expect(hosts()[0]!.style.getPropertyValue('display')).toBe('none');
+  });
+
+  it('hides instead of jumping to a corner when the panel is minimized', async () => {
+    const { panel, textarea } = mountPanel('a', 'Salom');
+    start();
+    focus(textarea);
+    await vi.waitFor(() => expect(button('.translate')).not.toBeNull());
+
+    // A minimized panel stays in the DOM but renders no boxes.
+    const bar = panel.querySelector<HTMLElement>('.composer-bar')!;
+    vi.spyOn(bar, 'getClientRects').mockReturnValue([] as unknown as DOMRectList);
+    window.dispatchEvent(new Event('resize'));
+    expect(hosts()[0]!.style.getPropertyValue('display')).toBe('none');
+  });
+
+  it('ignores the comment box and search field on the page behind the panel', async () => {
+    mountPanel('a', 'Salom');
+    start();
+    for (const field of document.querySelectorAll<HTMLElement>('main textarea, main input')) {
+      focus(field);
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(button('.translate')).toBeNull();
+    }
   });
 });
