@@ -4,454 +4,194 @@
 
 <p align="center"><strong>Translate where you type.</strong></p>
 
+<p align="center">
+  <a href="https://github.com/SherzodToshpulatov/browser-translator/actions/workflows/ci.yml"><img src="https://github.com/SherzodToshpulatov/browser-translator/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
+</p>
+
 # Tilmo
 
-Tilmo is an open-source browser extension, built with WXT, React and
-TypeScript, that translates your message draft in place on Telegram Web and
-Instagram Direct, inspired by Gboard Translate. Status: public beta
-preparation (0.1.0).
+Tilmo is an open-source browser extension that translates the message you are
+writing — right inside the message box on Telegram Web and Instagram — so you
+can check the translation, put it in place, and send it yourself.
 
-> **Privacy:** text you translate is sent to the translator you choose
-> (MyMemory by default, a third-party service). Drafts are read only when you
-> press Translate, are never stored, and messages are never sent for you. See
-> [PRIVACY.md](PRIVACY.md).
+> **Beta (0.1.0).** Tilmo works, but it is early software. Read
+> [Supported websites](#supported-websites) for what has and has not been tested.
 
-## How it works
+## Why Tilmo?
 
-1. Click a supported message box. A small round **Translate message** button
-   appears just above it, on the right.
-2. Press it. A panel opens and translates your draft with your saved languages.
-   It shows the active translator, the languages (with a swap button), and the
-   detected language when the translator reports one.
-3. **Replace** puts the translation into the message box; **Undo** restores your
-   draft. **Copy** copies the translation. **Cancel**, the close button, or
-   Escape closes the panel.
-4. You send the message yourself.
+Writing to someone in another language usually means copying your message into
+a translator, copying the result back, and fixing the formatting. Tilmo removes
+that round trip: a small button next to the message box translates your draft in
+place, shows you the result first, and lets you undo it.
 
-Changing a language in the open panel translates again. If the translation is
-the same as your text (names, links, or a phrase the translator does not know),
-the panel says so instead of offering Replace. The panel follows the page's
-light or dark theme and stays inside the window at any zoom level.
+## Features
 
-## Supported sites
+- **Translate button** next to the message box, in a compact floating panel.
+- **Preview first:** nothing changes in your message until you press **Replace**.
+- **Replace, Copy, and Undo**, with the original draft restored by **Undo**.
+- **Language selection** with a swap button and saved defaults; the detected
+  language is shown when the translator reports it.
+- **Languages:** Uzbek, English, Russian.
+- **Translators:** MyMemory (free, no setup), Google Cloud Translation through
+  your own server (optional), and an offline demo.
+- **Safety:** Tilmo never sends messages. Replace is offered only for plain-text
+  drafts, is refused if the draft or chat changed while translating, and is
+  checked after it runs.
+- **Light and dark themes** that follow the website.
 
-| Site | URLs | Composer |
+## Supported websites
+
+| Website | Where Tilmo appears | Testing status |
 | --- | --- | --- |
-| Telegram Web (K and A) | `https://web.telegram.org/*` | Tiptap/ProseMirror or plain editor |
-| Instagram Direct | `https://www.instagram.com/direct/*`, plus floating DM panels on any `www.instagram.com` page (Reels, posts, profiles) | Lexical editor or textarea |
+| Telegram Web | `web.telegram.org` (K and A versions) | Translate and Replace checked manually by the maintainer in desktop Chrome on Linux during development; automated tests against a real Tiptap/ProseMirror editor. |
+| Instagram Direct | `www.instagram.com/direct/…` | Automated tests against simulated Instagram markup and a real Lexical editor. **Not yet verified in a signed-in session.** |
+| Instagram floating chats | Chat panels opened over Reels, posts and profiles | Automated tests only. **Not yet verified in a signed-in session.** |
 
-## Telegram Web
+**Browser:** built for Google Chrome (Manifest V3) and checked only in desktop
+Chrome. Other Chromium-based browsers may work but are untested; Firefox and
+Safari are not supported.
 
-Works in Telegram Web K and A, with the Tiptap/ProseMirror composer and
-Telegram's plain editor. Languages: Oʻzbekcha, English, Русский.
+### Current limitations
 
-## Instagram Direct
+- Drafts that contain mentions, links, or other rich content can be translated and
+  copied, but not replaced.
+- MyMemory accepts at most 500 bytes per translation (about 250 Cyrillic
+  characters), cannot detect the source language, and its quality varies.
+- Instagram changes its page structure often; if the button does not appear, see
+  [docs/manual-testing.md](docs/manual-testing.md) for a privacy-safe diagnostic.
+- Only three languages so far.
 
-Open a conversation at `https://www.instagram.com/direct/…` and type a
-message: the same Translate button appears above the message bar (never over
-the emoji, attachment or Send buttons).
+## Screenshots
 
-The same controls work in the floating DM panels that open over Reels, posts,
-profiles and other pages. They follow whichever panel's message box you focus,
-hide when a panel is closed or minimized, and sit above that panel's message bar
-(never over its emoji, microphone, attachment or Send buttons).
+> Screenshots will be added before the first release. They must come from test
+> accounts with no private conversations.
 
-The content script runs on all `www.instagram.com` pages because Instagram
-navigates without reloading. It activates only for a genuine conversation
-composer, decided by the page structure rather than the URL:
-
-- The field must be a message box: a textarea or Lexical textbox labelled as a
-  message, never a search, comment, caption, note, name or story-reply field.
-- On the main `/direct/` page, that is enough.
-- In a dialog or fixed-position overlay (a floating panel), the overlay must
-  also contain a message thread (an element with role `grid`, `log` or `row`,
-  or a label mentioning messages, conversation or chat) and must not be a
-  recipient picker (search box or checkboxes, as in Share, Forward and New
-  message).
-- Anywhere else, it stays inactive.
-
-How replacement works: the composer is Instagram's Lexical editor (or a
-textarea on older layouts). The extension selects the draft and uses the
-browser's own `insertText` editing command for a single line, or a plain-text
-paste for several lines, so Instagram's editor updates its own state. It then
-reads the composer back; if the text did not stick exactly, the original draft is
-put back and only **Copy** is offered. A draft that contains anything besides
-plain text, emoji and line breaks (mentions, links, stickers, unknown
-structure) is never overwritten — use **Copy**.
-
-Privacy: only the active draft is read, and only after you press Translate.
-Chat history and received messages are never read, nothing is
-stored, and Instagram's network requests and private APIs are not touched.
-
-Known limitations:
-
-- Tested against a real Lexical editor and simulated Instagram markup, not yet
-  in a signed-in Instagram session. Instagram changes its DOM often; if the
-  button does not appear or Replace stays unavailable, use Copy and report the
-  DOM structure (see the checklist below).
-- Floating DM panels are recognised by the structure described above, which is
-  based on how Instagram typically marks up chats, not on a live inspection. If a
-  panel's composer gets no Translate button, run the diagnostic below.
-- A panel minimized by an animation that keeps its boxes on screen is only
-  detected once focus leaves it (clicking elsewhere hides the controls).
-
-## Translators
-
-Choose one in the extension popup. MyMemory is the default because it works
-without any setup.
-
-| Translator | Setup | Source language | Limits |
+| Telegram Web | Translate panel | Instagram floating chat | Settings |
 | --- | --- | --- | --- |
-| **MyMemory (Free)** | none; optional contact email | must be chosen (no auto-detect) | 500 bytes per translation; free daily allowance, higher with an email |
-| **Google Cloud (your server)** | deploy `apps/api`, add URL + access token | Auto or chosen | set by your Worker and Google quotas |
-| **Demo (offline, not real)** | none | Auto or chosen | labelled demo output, for development |
+| *coming soon* | *coming soon* | *coming soon* | *coming soon* |
 
-**MyMemory** ([api.mymemory.translated.net](https://mymemory.translated.net/doc/spec.php))
-is called directly from the extension's background service worker with a GET
-request: no API key, no account, and no extra host permission (the API allows
-any origin). Notes:
+## Install
 
-- Drafts go to MyMemory (Translated srl) only when you press Translate. Read
-  their terms before translating sensitive text.
-- Drafts over 500 UTF-8 bytes are refused before sending (about 500 Latin or
-  250 Cyrillic characters; emoji count as 4 bytes).
-- The optional contact email is sent as MyMemory's `de` parameter for the
-  higher daily allowance described in their
-  [usage limits](https://mymemory.translated.net/doc/usagelimits.php). It is stored
-  only in this browser.
-- MyMemory reports errors inside normal-looking responses. The extension checks
-  `responseStatus` and shows a clear message for unsupported language pairs,
-  exhausted quota, or empty results — never the error text as a translation.
-- MyMemory sends the draft in the request URL (a GET request), which servers
-  commonly log. See [PRIVACY.md](PRIVACY.md).
-- Results can come from MyMemory's translation memory, so quality varies.
+### From a GitHub release (beta)
 
-Safety rules shared by all translators and sites:
+Tilmo is not yet in the Chrome Web Store. To install a release build:
 
-- Text leaves the browser only when you press Translate (or change a language in
-  the open panel).
-- Replace is offered only for plain-text drafts. Drafts with links, mentions or
-  formatting can be copied but are never overwritten.
-- If the draft changes or you switch chats while a translation is pending,
-  Replace and Undo are refused.
-- The extension never sends a message.
+1. Download `tilmo-<version>-chrome.zip` from the
+   [Releases page](https://github.com/SherzodToshpulatov/browser-translator/releases).
+2. Unzip it into a folder you will keep (Chrome loads the extension from there).
+3. Open `chrome://extensions` and turn on **Developer mode** (top right).
+4. Click **Load unpacked** and select the unzipped folder (the one containing
+   `manifest.json`).
+5. Optionally pin Tilmo from the puzzle-piece menu, then open Telegram Web or
+   Instagram and click a message box.
+
+Updates are not automatic: to update, replace the folder's contents with the
+new release and click the reload icon on Tilmo's card in `chrome://extensions`.
+
+### From source (developers)
+
+Requirements: [Node.js](https://nodejs.org/) 26 (see `.nvmrc`) and npm.
+
+```bash
+git clone https://github.com/SherzodToshpulatov/browser-translator.git
+cd browser-translator
+npm ci
+npm run build
+```
+
+Then load `.output/chrome-mv3` with **Load unpacked** as described above.
+
+## Development
+
+```bash
+npm ci          # install exact dependency versions from the lockfile
+npm run dev     # development build with live reload
+```
+
+`npm run dev` builds `.output/chrome-mv3-dev`; load it with **Load unpacked** if
+WXT does not open a browser for you, and keep the command running while you use
+that build.
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Development build with live reload |
+| `npm run build` | Production build in `.output/chrome-mv3` |
+| `npm run zip` | Production build packaged as `.output/tilmo-<version>-chrome.zip` |
+| `npm run compile` | TypeScript type check |
+| `npm test` | Unit tests (translation APIs are mocked) |
+| `npm run test:live` | Optional: real MyMemory requests with fixed sample sentences |
+| `npm run icons` | Regenerate `public/icon/*.png` from the brand SVG (needs local Chrome) |
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for conventions and the pull request
+process. Maintainers: the release process is in
+[docs/release-checklist.md](docs/release-checklist.md), and the draft Chrome Web
+Store listing in [docs/chrome-web-store.md](docs/chrome-web-store.md).
 
 ## Architecture
 
 ```text
-Telegram tab                    Extension service worker          Cloudflare Worker (apps/api)       Google
-content script ── message ──▶   background.ts            ─HTTPS─▶ POST /v1/translate        ──────▶  Cloud Translation
-(reads draft, shows preview)    (holds URL + access token)        auth → rate limit → validate        Basic (v2)
-                                                                  → monthly budget (Durable Object)
+Telegram / Instagram tab                         Extension service worker              Translator
+┌──────────────────────────────┐   message    ┌──────────────────────────┐   HTTPS   ┌─────────────────────┐
+│ content script               │ ───────────▶ │ background.ts            │ ────────▶ │ MyMemory (default)  │
+│ • site adapter finds the     │              │ • reads settings         │           │ or your own server  │
+│   message box                │ ◀─────────── │ • calls the selected     │ ◀──────── │ (apps/api → Google) │
+│ • Shadow DOM panel (React)   │   result     │   translator             │           └─────────────────────┘
+│ • Replace / Undo with checks │              └──────────────────────────┘
+└──────────────────────────────┘                      ▲ popup.html: settings (chrome.storage)
 ```
 
-- `src/services/translation.ts` – provider-independent `TranslationService`
-  interface, error codes, and the offline `mockTranslationService`.
-- `src/services/remote-translation.ts` – `RemoteTranslationService`, the HTTP
-  client for the Worker. Used only by the background service worker.
-- `src/services/mymemory-translation.ts` – `MyMemoryTranslationService`, which
-  calls MyMemory directly. `src/services/providers.ts` lists the translators and
-  whether each supports auto-detection.
-- `entrypoints/background.ts` – receives translate requests from the content
-  script, reads settings, and calls the selected translator. The content script
-  never sees the access token.
-- `src/content/floating-translator.tsx` – the shared floating controls: Shadow
-  DOM host, positioning, translate/Replace/Undo flow, navigation and
-  draft-change protection. DOM mutations and scrolling are coalesced into one
-  update per animation frame. `layout.ts` holds the positioning math and
-  `theme.ts` the light/dark detection. `src/components/TranslatePanel.tsx` is the
-  UI, styled only with extension-owned tokens inside the Shadow DOM. Each site's content script
-  (`entrypoints/telegram.content.tsx`, `entrypoints/instagram.content.tsx`)
-  passes in its editor adapter and composer finders.
-- `src/adapters/telegram.ts`, `src/adapters/instagram.ts` – site-specific
-  `MessageEditorAdapter`s (detection, plain-text reading, safe replacement), with
-  shared helpers in `src/adapters/editor-utils.ts`.
-- `entrypoints/popup` – settings: translator, server URL, access token.
-- `apps/api` – the Cloudflare Worker. `providers/google.ts` implements
-  `GoogleCloudTranslationProvider`; other providers can implement the same
-  `TranslationProvider` interface without touching the extension.
-
-The Google API key exists only as a Worker secret. It is never in the extension,
-in frontend environment variables, or in git.
-
-### Adding a language
-
-Add it to `LANGUAGES` in `src/core/languages.ts` and to `SUPPORTED_LANGUAGES` in
-`apps/api/wrangler.jsonc`.
-
-## API
-
-`POST /v1/translate` with `Authorization: Bearer <access token>`:
-
-```json
-{ "text": "Salom, yaxshimisan?", "source": "auto", "target": "en" }
-```
-
-```json
-{ "translatedText": "Hello, how are you?", "detectedSourceLanguage": "uz", "provider": "google" }
-```
-
-Errors are always `{ "error": { "code": "...", "message": "..." } }`:
-
-| Status | Codes |
+| Path | Responsibility |
 | --- | --- |
-| 400 | `invalid_json`, `invalid_request`, `empty_text`, `unsupported_language` |
-| 401 | `unauthorized` |
-| 413 | `payload_too_large`, `text_too_long` |
-| 415 | `unsupported_media_type` |
-| 429 | `rate_limited` (per token), `quota_exceeded` (monthly budget) |
-| 502 / 503 / 504 | `provider_error`, `provider_rate_limited`, `provider_timeout` |
-| 500 | `server_misconfigured`, `internal_error` |
+| `entrypoints/telegram.content.tsx`, `entrypoints/instagram.content.tsx` | Content scripts; each passes its site adapter to the shared controller |
+| `src/adapters/telegram.ts`, `src/adapters/instagram.ts` | Find the message box, read plain-text drafts, and replace them safely |
+| `src/content/floating-translator.tsx` | Shared controller: Shadow DOM host, positioning, translate → preview → Replace/Undo, navigation and draft-change protection |
+| `src/components/TranslatePanel.tsx` | The floating button and translation panel |
+| `src/core/draft-manager.ts` | Snapshot, replace and undo with change detection |
+| `entrypoints/background.ts` | Receives translation requests and calls the selected translator; holds connection settings |
+| `src/services/` | Translator implementations (`mymemory-translation.ts`, `remote-translation.ts`, demo) behind one interface |
+| `entrypoints/popup/` | Settings popup |
+| `apps/api/` | Optional self-hosted Cloudflare Worker for Google Cloud Translation |
 
-`GET /v1/health` returns `{ "status": "ok" }` without authentication.
+More detail: [docs/site-integrations.md](docs/site-integrations.md).
 
-## Security and cost controls
+## Translation providers
 
-This is a **private developer MVP**. The Worker is not an open translation proxy:
+| Translator | Setup | Source language | Notes |
+| --- | --- | --- | --- |
+| **MyMemory (Free)** — default | None; optional contact email for a higher daily limit | Must be chosen | Third-party service by Translated srl. 500-byte limit per request. |
+| **Google Cloud (your server)** | Deploy [`apps/api`](apps/api/README.md) to your Cloudflare account and add a Google Cloud API key | Auto-detect or chosen | You run and pay for this yourself; Tilmo has no hosted server. |
+| **Demo (offline)** | None | Auto or chosen | Labelled placeholder output for trying the interface. |
 
-1. **Access tokens.** Every request needs a bearer token. The Worker stores only
-   SHA-256 hashes of allowed tokens (`API_ACCESS_TOKEN_HASHES`), compares them in
-   constant time, and fails closed if none are configured. Each tester gets their
-   own token and pastes it into the popup; nothing secret ships in the extension.
-   CORS and the extension ID are *not* used as authentication.
-2. **Throttling.** A Cloudflare Rate Limiting binding allows 20 requests per
-   minute per token (`wrangler.jsonc` → `ratelimits`). It is approximate and
-   enforced per Cloudflare location, so it limits bursts, not spending.
-3. **Monthly character budget.** A single SQLite-backed Durable Object reserves
-   characters before every Google call and refuses requests once
-   `MONTHLY_CHARACTER_LIMIT` (default 400,000) is reached for the UTC month.
-   Durable Objects handle requests one at a time, so this cap is strict for this
-   Worker. Characters are returned when Google rejects a request, but kept when it
-   times out (it may still have been billed). Counting uses UTF-16 length, which
-   is never less than Google's character count.
-4. **Input limits.** JSON only, at most `MAX_BODY_BYTES` (16 KiB) read from the
-   body, at most `MAX_TEXT_CHARS` (2,000) characters, supported languages only,
-   well-formed Unicode only, and an 8 s timeout on Google calls.
-5. **No sensitive logging.** The Worker logs only error kinds and HTTP statuses —
-   never message text, tokens, or Google response bodies. Responses carry
-   `Cache-Control: no-store`.
-6. **Google-side limits (strongly recommended).** The Worker budget does not
-   replace Google's own controls: set a daily character quota on the Cloud
-   Translation API and a billing budget with alerts (see setup below). Budgets
-   only alert; they do not stop charges.
+## Privacy
 
-### Before a public release
+Tilmo reads your draft only when you ask for a translation, and sends it to the
+translator you selected — MyMemory by default, which is a third-party service
+with its own terms. Tilmo has no servers of its own, stores settings but not
+your drafts, includes no analytics, and never sends messages for you. Full
+details, including exactly what each translator receives: [PRIVACY.md](PRIVACY.md).
 
-A shared-token model does not work for a public extension: anything shipped in
-the extension can be extracted. A public version needs per-user identity (for
-example Google sign-in via `chrome.identity`, exchanged for short-lived tokens
-issued by the Worker), per-user quotas keyed by that identity in the Durable
-Object, abuse monitoring, and a privacy policy. Rotate any MVP tokens at that point.
+## Roadmap
 
-## Setup
+Ideas under consideration, not commitments:
 
-The extension works with MyMemory out of the box: build it (step 3) and load it.
-Steps 1, 2 and 4 are only needed for the optional Google Cloud translator.
+- Verify and harden Instagram support in real signed-in sessions.
+- Publish to the Chrome Web Store.
+- More languages.
+- Keep drafts out of request URLs where providers allow it (MyMemory currently
+  uses GET requests).
+- Support for more messaging websites.
 
-### 1. Google Cloud
+## Contributing
 
-1. In the [Google Cloud console](https://console.cloud.google.com/), create or
-   select a project and link a billing account. Cloud Translation requires
-   billing even within the free tier; check the current
-   [pricing](https://cloud.google.com/translate/pricing) before enabling it.
-2. Enable the **Cloud Translation API**: *APIs & Services → Library → Cloud
-   Translation API → Enable* (or `gcloud services enable translate.googleapis.com`).
-3. Create an API key: *APIs & Services → Credentials → Create credentials → API
-   key*. Edit it and under **API restrictions** choose *Restrict key → Cloud
-   Translation API*. Leave application restrictions unset; Workers have no fixed
-   egress IP. Keep the key private.
-4. Limit usage: *APIs & Services → Cloud Translation API → Quotas & system
-   limits*, and lower the per-day character quota to what you are willing to pay
-   for.
-5. Add a budget: *Billing → Budgets & alerts → Create budget*, with email alerts
-   at e.g. 50%, 90%, and 100%.
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and the
+[Code of Conduct](CODE_OF_CONDUCT.md). Please report security problems privately
+as described in [SECURITY.md](SECURITY.md). Changes are listed in
+[CHANGELOG.md](CHANGELOG.md).
 
-### 2. Backend (local)
+## License
 
-```bash
-cd apps/api
-npm install
-cp .dev.vars.example .dev.vars
-npm run token:create        # prints a new access token and its hash
-```
-
-Edit `.dev.vars` (git-ignored): set `GOOGLE_TRANSLATE_API_KEY` to your key and
-`API_ACCESS_TOKEN_HASHES` to the printed hash. Then:
-
-```bash
-npm run dev                 # http://localhost:8787
-```
-
-Requests to the local server call the real Google API and count toward billing.
-
-### 3. Extension
-
-```bash
-npm install
-npm run dev                 # loads .output/chrome-mv3-dev
-```
-
-Load `.output/chrome-mv3-dev` at `chrome://extensions` (Developer mode → *Load
-unpacked*) if WXT did not open a browser for you. Keep `npm run dev` running
-while you use the dev build; it connects to the dev server on port 3000.
-
-For a production build, run `npm run build` and load `.output/chrome-mv3`.
-
-MyMemory is selected by default. To use your local server instead, open the
-extension popup, choose **Google Cloud (your server)**, enter
-`http://localhost:8787` and the access token, press **Save**, and allow access
-to the server when Chrome asks. Choose **Demo (offline, not real)** to try the
-UI without any network; demo results are labelled as such.
-
-### 4. Deploy the Worker
-
-```bash
-cd apps/api
-npx wrangler login
-npx wrangler secret put GOOGLE_TRANSLATE_API_KEY
-npx wrangler secret put API_ACCESS_TOKEN_HASHES   # comma-separated hashes
-npm run deploy
-```
-
-Put the deployed `https://<name>.<subdomain>.workers.dev` URL into the popup.
-Adjust limits in `wrangler.jsonc` → `vars` and `ratelimits`, then redeploy.
-To revoke a tester, remove their hash from `API_ACCESS_TOKEN_HASHES`.
-
-## Testing
-
-```bash
-npm run compile             # extension type check
-npm test                    # extension unit tests (offline; MyMemory is mocked)
-npm run test:live           # optional: real MyMemory calls with fixed sample sentences
-npm run build               # production build in .output/chrome-mv3
-
-cd apps/api
-npm run typecheck
-npm test                    # Worker tests; Google is mocked, no paid requests
-```
-
-Manual check against a running backend:
-
-```bash
-curl -s http://localhost:8787/v1/translate \
-  -H 'content-type: application/json' \
-  -H "authorization: Bearer $TOKEN" \
-  -d '{"text":"Salom, yaxshimisan?","source":"auto","target":"en"}'
-```
-
-In Telegram Web: type a draft, pick a target language, press **Translate**,
-check the detected language and preview, press **Replace**, then **Undo**. Send
-the message yourself.
-
-### Manual checklist: Instagram Direct
-
-1. `npm run build`, reload the extension at `chrome://extensions`, then reload
-   the Instagram tab.
-2. Open `https://www.instagram.com/direct/inbox/` and pick a conversation.
-3. Click the message box and type `Salom, yaxshimisan?`. The controls appear
-   above the message bar without covering Send, emoji, or attachment buttons.
-4. Choose a source (Oʻzbekcha for MyMemory) and target, press **Translate**:
-   a preview appears and the message is **not** sent.
-5. Press **Replace**: the message box shows the translation. Type one letter to
-   check Instagram still accepts input, delete it, then press **Undo**.
-6. Repeat with a two-line draft (Shift+Enter) and with emoji.
-7. Edit the draft after pressing Translate, then press Replace: it is refused.
-8. Press Translate, then switch to another conversation before it finishes: no
-   stale preview appears in the new conversation.
-9. Click the Instagram search box, a post's comment field, and the
-   share/forward dialog: no Translate controls appear.
-10. Open the home feed or a profile without a chat panel: no controls appear.
-
-If the controls do not appear or Replace is unavailable for plain text, run this
-in DevTools on the conversation (it prints structure and text lengths only):
-
-```js
-(function () {
-  var ed = document.activeElement;
-  var out = [];
-  (function walk(n, d) {
-    var pad = new Array(d + 1).join('  ');
-    if (n.nodeType === 3) { out.push(pad + '#text len=' + n.data.length); return; }
-    if (n.nodeType !== 1) return;
-    out.push(pad + '<' + n.tagName.toLowerCase() + '> attrs=[' + n.getAttributeNames().join(',') + ']');
-    for (var i = 0; i < n.childNodes.length; i++) walk(n.childNodes[i], d + 1);
-  })(ed, 0);
-  console.log(out.join('\n'));
-})();
-```
-
-### Manual checklist: floating DM panels
-
-1. Open a Reel, then open a chat from the Messages button so a floating panel
-   appears. Click its message box and type `nima gap`: the controls appear
-   above that panel's message bar, not in a page corner.
-2. Translate, Replace, and Undo as above. Nothing is sent until you press Send.
-3. Repeat over a profile page and a post page.
-4. With two panels open, click into one, then the other: the controls follow
-   the focused message box and Translate uses that panel's draft.
-5. Minimize and close a panel: the controls disappear. Reopen it: they return
-   when you click its message box.
-6. Press Translate with an empty message box: an error asks you to type a
-   draft; no request is made.
-7. Click the comment box of the Reel behind the panel and the search box: no
-   controls appear.
-
-If a floating panel's composer gets no controls, click its message box and run
-this in DevTools. It prints only element names, roles, positioning and which
-detection rules match — no message text, names or labels:
-
-```js
-(function () {
-  var ed = document.activeElement, rows = [];
-  var markers = '[role="grid"],[role="log"],[role="row"],[data-scope="messages_table"],[aria-label*="message" i],[aria-label*="conversation" i],[aria-label*="chat" i]';
-  var pickers = 'input[type="checkbox"],[role="checkbox"],input[type="search"],input[aria-label*="search" i],input[placeholder*="search" i],[role="searchbox"]';
-  rows.push('editor: <' + ed.tagName.toLowerCase() + '> role=' + ed.getAttribute('role') +
-    ' lexical=' + ed.hasAttribute('data-lexical-editor') +
-    ' messageLabel=' + /\bmessages?\b|сообщени|xabar/i.test([ed.getAttribute('aria-label'), ed.getAttribute('placeholder'), ed.getAttribute('aria-placeholder')].join(' ')));
-  for (var n = ed.parentElement, d = 1; n && n !== document.body && d <= 15; n = n.parentElement, d++) {
-    var fixed = getComputedStyle(n).position === 'fixed', dialog = n.matches('[role="dialog"],[aria-modal="true"]');
-    if (!fixed && !dialog) continue;
-    var threadCount = Array.from(n.querySelectorAll(markers)).filter(function (m) { return m !== ed && !m.contains(ed) && !ed.contains(m); }).length;
-    rows.push('ancestor ' + d + ': <' + n.tagName.toLowerCase() + '> fixed=' + fixed + ' dialog=' + dialog +
-      ' threadMarkers=' + threadCount + ' pickers=' + n.querySelectorAll(pickers).length +
-      ' conversationLabel=' + /\b(conversation|chat|messages)\b/i.test(n.getAttribute('aria-label') || ''));
-  }
-  console.log(rows.join('\n'));
-})();
-```
-
-Run `npm run cf-typegen` in `apps/api` after changing `wrangler.jsonc` bindings
-or vars.
-
-## Releasing
-
-- [docs/release-checklist.md](docs/release-checklist.md) — build, manifest and
-  manual browser checks for each release.
-- [docs/chrome-web-store.md](docs/chrome-web-store.md) — draft store listing,
-  permission justifications, data disclosures and asset specifications.
-- Icons are generated from `assets/brand/tilmo-icon-dark.svg` with
-  `npm run icons` (requires a local Google Chrome). See [Brand](#brand).
-- The project has no license file yet; choose one before publishing.
-
-## Brand
-
-The Tilmo mark is a **T** whose crossbar is split into two halves at slightly
-different heights — one cyan, one solid — a quiet nod to switching between
-languages. It is built from three rounded rectangles on a 128-unit grid with
-16-unit strokes, so it stays a recognisable T at 16×16.
-
-| File | Use |
-| --- | --- |
-| `assets/brand/tilmo-logo.svg` | Primary symbol, transparent background (navy, or light in dark mode) |
-| `assets/brand/tilmo-wordmark.svg` | Symbol with the "Tilmo" lettering, drawn as vector strokes |
-| `assets/brand/tilmo-icon-dark.svg` | App icon on a navy tile — source for `public/icon/*.png` |
-| `assets/brand/tilmo-icon-light.svg` | App icon on a light tile |
-
-Palette: cyan `#22D3EE`, navy `#0F172A`, light `#F8FAFC`. Cyan is used as a
-fill or on navy; on light backgrounds, text and focus rings use the deeper
-`#0E7490`, because `#22D3EE` on white is below the 3:1 contrast minimum.
-
-Internal identifiers keep the original project name so existing setups keep
-working: the GitHub repository, the `browser-translator-api` Worker (its name
-is part of its deployed URL), and the floating UI's DOM id.
-
+Tilmo is released under the [MIT License](LICENSE). The extension package also
+includes third-party open-source code; see
+[public/THIRD_PARTY_NOTICES.txt](public/THIRD_PARTY_NOTICES.txt). Brand assets
+are described in [docs/brand.md](docs/brand.md).

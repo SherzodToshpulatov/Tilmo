@@ -7,18 +7,30 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies and build output
 node_modules
 .output
+.wxt
 stats.html
 stats-*.json
-.wxt
+coverage
+*.tsbuildinfo
+.eslintcache
+
+# Local WXT runner config (browser paths, profiles)
 web-ext.config.ts
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
@@ -33,3 +45,9 @@ web-ext.config.ts
 .env.*
 !.env.example
 .wrangler
+
+# Extension signing keys and packed builds: a leaked .pem lets anyone sign
+# updates as this extension. Release ZIPs are produced in .output by CI.
+*.pem
+*.crx
+*.xpi

@@ -1,0 +1,77 @@
+name: Release
+
+# Push a tag like v0.1.0 (matching package.json "version") to build the
+# extension and create a DRAFT pre-release with the ZIP attached. Review the
+# draft on GitHub and publish it manually.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and draft release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check that the tag matches package.json
+        id: version
+        run: |
+          version="$(node -p 'require("./package.json").version')"
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Type check
+        run: npm run compile
+
+      - name: Test
+        run: npm test
+
+      - name: Build and package
+        run: npm run zip
+
+      - name: Collect release files
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          zip_file="$(ls .output/*-"$VERSION"-chrome.zip)"
+          test "$(echo "$zip_file" | wc -l)" -eq 1
+          echo "ZIP_FILE=$zip_file" >> "$GITHUB_ENV"
+          # Release notes: the CHANGELOG section for this version.
+          awk -v v="$VERSION" '
+            index($0, "## [" v "]") == 1 { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "::error::CHANGELOG.md has no section for $VERSION"
+            exit 1
+          fi
+
+      - name: Create draft pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "$ZIP_FILE" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft \
+            --prerelease \
+            --title "Tilmo $VERSION (beta)" \
+            --notes-file release-notes.md

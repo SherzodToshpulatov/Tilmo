@@ -1,0 +1,94 @@
+name: Bug report
+description: Something in Tilmo does not work as expected.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! **Do not include private messages, real chat screenshots, access tokens, API keys, or other personal information.** Use made-up text and test accounts.
+        Security problems must be reported privately — see [SECURITY.md](https://github.com/SherzodToshpulatov/browser-translator/blob/main/SECURITY.md).
+  - type: input
+    id: version
+    attributes:
+      label: Tilmo version
+      description: From chrome://extensions (or the commit if you built it yourself).
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and version
+      placeholder: "Google Chrome 156.0.8078.73"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "Ubuntu 26.04 / Windows 11 / macOS 26"
+    validations:
+      required: true
+  - type: dropdown
+    id: site
+    attributes:
+      label: Website
+      options:
+        - Telegram Web K (web.telegram.org/k)
+        - Telegram Web A (web.telegram.org/a)
+        - Instagram Direct (instagram.com/direct)
+        - Instagram floating chat panel (over Reels, posts, profiles)
+        - Extension popup
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: translator
+    attributes:
+      label: Translator
+      options:
+        - MyMemory (Free)
+        - Google Cloud (your server)
+        - Demo (offline)
+        - Not relevant
+  - type: input
+    id: languages
+    attributes:
+      label: Languages and theme
+      placeholder: "Oʻzbekcha → English, dark theme"
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a conversation on …
+        2. Type a short made-up message
+        3. Press Translate …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: Include error messages from the Translate panel or the DevTools console, with any private text removed.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics (optional)
+      description: For "button does not appear" or "Replace unavailable" problems, the privacy-safe DevTools snippet in docs/manual-testing.md prints page structure only.
+      render: text
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed private messages, names, tokens and keys from this report.
+          required: true

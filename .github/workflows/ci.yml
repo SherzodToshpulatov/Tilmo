@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  extension:
+    name: Extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # Also runs `wxt prepare` (postinstall), which generates .wxt types.
+      - name: Install dependencies
+        run: npm ci
+
+      # No linter is configured in package.json yet; add a `lint` script and a
+      # step here to enable one.
+      - name: Type check
+        run: npm run compile
+
+      - name: Test
+        run: npm test
+
+      - name: Build and package
+        run: npm run zip
+
+      - name: Upload extension package
+        uses: actions/upload-artifact@v7
+        with:
+          name: tilmo-chrome-${{ github.sha }}
+          path: .output/*-chrome.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  backend:
+    name: Backend (apps/api)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: apps/api/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
