@@ -5,7 +5,7 @@
 <p align="center"><strong>Translate where you type.</strong></p>
 
 <p align="center">
-  <a href="https://github.com/SherzodToshpulatov/browser-translator/actions/workflows/ci.yml"><img src="https://github.com/SherzodToshpulatov/browser-translator/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <a href="https://github.com/SherzodToshpulatov/Tilmo/actions/workflows/ci.yml"><img src="https://github.com/SherzodToshpulatov/Tilmo/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
 </p>
 
@@ -78,7 +78,7 @@ Safari are not supported.
 Tilmo is not yet in the Chrome Web Store. To install a release build:
 
 1. Download `tilmo-<version>-chrome.zip` from the
-   [Releases page](https://github.com/SherzodToshpulatov/browser-translator/releases).
+   [Releases page](https://github.com/SherzodToshpulatov/Tilmo/releases).
 2. Unzip it into a folder you will keep (Chrome loads the extension from there).
 3. Open `chrome://extensions` and turn on **Developer mode** (top right).
 4. Click **Load unpacked** and select the unzipped folder (the one containing
@@ -94,8 +94,8 @@ new release and click the reload icon on Tilmo's card in `chrome://extensions`.
 Requirements: [Node.js](https://nodejs.org/) 26 (see `.nvmrc`) and npm.
 
 ```bash
-git clone https://github.com/SherzodToshpulatov/browser-translator.git
-cd browser-translator
+git clone https://github.com/SherzodToshpulatov/Tilmo.git
+cd Tilmo
 npm ci
 npm run build
 ```

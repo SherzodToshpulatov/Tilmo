@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         Thanks for reporting! **Do not include private messages, real chat screenshots, access tokens, API keys, or other personal information.** Use made-up text and test accounts.
-        Security problems must be reported privately — see [SECURITY.md](https://github.com/SherzodToshpulatov/browser-translator/blob/main/SECURITY.md).
+        Security problems must be reported privately — see [SECURITY.md](https://github.com/SherzodToshpulatov/Tilmo/blob/main/SECURITY.md).
   - type: input
     id: version
     attributes:

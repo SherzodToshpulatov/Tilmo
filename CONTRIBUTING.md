@@ -19,7 +19,7 @@ follow the [Code of Conduct](CODE_OF_CONDUCT.md).
    ```bash
    git clone https://github.com/<your-username>/<your-fork>.git
    cd <your-fork>
-   git remote add upstream https://github.com/SherzodToshpulatov/browser-translator.git
+   git remote add upstream https://github.com/SherzodToshpulatov/Tilmo.git
    ```
 
 2. Install **Node.js 26** (the version in `.nvmrc`; with nvm: `nvm use`) and npm.

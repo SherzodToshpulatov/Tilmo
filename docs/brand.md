@@ -16,6 +16,6 @@ Palette: cyan `#22D3EE`, navy `#0F172A`, light `#F8FAFC`. Cyan is used as a
 fill or on navy; on light backgrounds, text and focus rings use the deeper
 `#0E7490`, because `#22D3EE` on white is below the 3:1 contrast minimum.
 
-Internal identifiers keep the original project name so existing setups keep
-working: the GitHub repository, the `browser-translator-api` Worker (its name
-is part of its deployed URL), and the floating UI's DOM id.
+Two internal identifiers keep the original project name so existing setups keep
+working: the `browser-translator-api` Worker (its name is part of its deployed
+URL) and the floating UI's DOM id.

@@ -43,4 +43,4 @@ First public beta.
   source language.
 - Tested in desktop Google Chrome only.
 
-[0.1.0]: https://github.com/SherzodToshpulatov/browser-translator/releases/tag/v0.1.0
+[0.1.0]: https://github.com/SherzodToshpulatov/Tilmo/releases/tag/v0.1.0

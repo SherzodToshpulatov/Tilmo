@@ -46,6 +46,8 @@ jobs:
         with:
           name: tilmo-chrome-${{ github.sha }}
           path: .output/*-chrome.zip
+          # .output is a dot-folder, which upload-artifact skips by default.
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 14
 

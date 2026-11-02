@@ -19,7 +19,7 @@ import {
 } from '@/src/utils/settings';
 import './App.css';
 
-const PRIVACY_URL = 'https://github.com/SherzodToshpulatov/browser-translator/blob/main/PRIVACY.md';
+const PRIVACY_URL = 'https://github.com/SherzodToshpulatov/Tilmo/blob/main/PRIVACY.md';
 
 type Status = { kind: 'idle' | 'saved' | 'error'; message: string };
 type FieldErrors = Partial<Record<'email' | 'url' | 'token', string>>;
