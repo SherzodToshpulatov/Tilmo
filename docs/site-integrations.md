@@ -48,12 +48,11 @@ stored, and Instagram's network requests and private APIs are not touched.
 
 Known limitations:
 
-- Tested against a real Lexical editor and simulated Instagram markup, not yet
-  in a signed-in Instagram session. Instagram changes its DOM often; if the
-  button does not appear or Replace stays unavailable, use Copy and report the
-  DOM structure (see the checklist below).
-- Floating DM panels are recognised by the structure described above, which is
-  based on how Instagram typically marks up chats, not on a live inspection. If a
-  panel's composer gets no Translate button, run the diagnostic below.
+- Instagram changes its DOM often. If the button does not appear or Replace
+  stays unavailable, use Copy and report the DOM structure using the diagnostic in
+  [manual-testing.md](manual-testing.md).
+- Floating DM panels are recognised by the structure described above. If a
+  panel's composer gets no Translate button, run the floating-panel diagnostic in
+  [manual-testing.md](manual-testing.md).
 - A panel minimized by an animation that keeps its boxes on screen is only
   detected once focus leaves it (clicking elsewhere hides the controls).

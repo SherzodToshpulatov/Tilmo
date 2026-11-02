@@ -37,8 +37,8 @@ First public beta.
 
 ### Known limitations
 
-- Instagram support has been tested against simulated markup and a real Lexical
-  editor, but not yet in a signed-in Instagram session.
+- Instagram changes its page structure often, which can stop the Translate
+  button from appearing until Tilmo is updated.
 - MyMemory accepts at most 500 bytes per translation and cannot detect the
   source language.
 - Tested in desktop Google Chrome only.

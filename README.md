@@ -45,8 +45,8 @@ place, shows you the result first, and lets you undo it.
 | Website | Where Tilmo appears | Testing status |
 | --- | --- | --- |
 | Telegram Web | `web.telegram.org` (K and A versions) | Translate and Replace checked manually by the maintainer in desktop Chrome on Linux during development; automated tests against a real Tiptap/ProseMirror editor. |
-| Instagram Direct | `www.instagram.com/direct/…` | Automated tests against simulated Instagram markup and a real Lexical editor. **Not yet verified in a signed-in session.** |
-| Instagram floating chats | Chat panels opened over Reels, posts and profiles | Automated tests only. **Not yet verified in a signed-in session.** |
+| Instagram Direct | `www.instagram.com/direct/…` | Checked manually by the maintainer in signed-in sessions in desktop Chrome; automated tests against a real Lexical editor. |
+| Instagram floating chats | Chat panels opened over Reels, posts and profiles | Checked manually by the maintainer in signed-in sessions in desktop Chrome; automated tests. |
 
 **Browser:** built for Google Chrome (Manifest V3) and checked only in desktop
 Chrome. Other Chromium-based browsers may work but are untested; Firefox and
@@ -175,7 +175,7 @@ details, including exactly what each translator receives: [PRIVACY.md](PRIVACY.m
 
 Ideas under consideration, not commitments:
 
-- Verify and harden Instagram support in real signed-in sessions.
+- Keep Instagram support working as Instagram changes its page structure.
 - Publish to the Chrome Web Store.
 - More languages.
 - Keep drafts out of request URLs where providers allow it (MyMemory currently
